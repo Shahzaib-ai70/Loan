@@ -265,8 +265,10 @@ app.post('/api/agent/login', (req, res) => {
     return;
   }
   const agent = db
-    .prepare('SELECT id, username, password, invite_code, api_key, created_at FROM agents WHERE lower(username) = ?')
-    .get(normalize(u));
+    .prepare(
+      'SELECT id, username, password, invite_code, api_key, created_at FROM agents WHERE lower(username) = ? OR invite_code = ?',
+    )
+    .get(normalize(u), u);
   if (!agent || String(agent.password) !== p) {
     res.status(401).json({ message: 'Invalid agent login.' });
     return;
@@ -306,7 +308,7 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
 });
 
 app.get('/api/admin/agents', requireAdmin, (_req, res) => {
-  const agents = db.prepare('SELECT id, username, invite_code, created_at FROM agents ORDER BY created_at DESC').all();
+  const agents = db.prepare('SELECT id, username, password, invite_code, created_at FROM agents ORDER BY created_at DESC').all();
   const counts = db
     .prepare('SELECT agent_id, COUNT(*) as total FROM users WHERE agent_id IS NOT NULL GROUP BY agent_id')
     .all();
@@ -315,6 +317,7 @@ app.get('/api/admin/agents', requireAdmin, (_req, res) => {
     agents: agents.map((a) => ({
       id: a.id,
       username: a.username,
+      password: a.password,
       inviteCode: a.invite_code,
       createdAt: a.created_at,
       totalCustomers: totals[a.id] || 0,

@@ -67,6 +67,7 @@ export type AdminOverviewResponse = {
 export type AgentSummary = {
   id: string;
   username: string;
+  password?: string;
   inviteCode: string;
   createdAt: number;
   totalCustomers: number;

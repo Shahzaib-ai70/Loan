@@ -101,14 +101,6 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     loadOverview(agentKey);
   }, [agentKey]);
 
-  useEffect(() => {
-    if (!agentKey) return;
-    const id = window.setInterval(() => {
-      loadOverview(agentKey);
-    }, 10000);
-    return () => window.clearInterval(id);
-  }, [agentKey]);
-
   const login = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -353,4 +345,3 @@ function SidebarItem({
     </button>
   );
 }
-

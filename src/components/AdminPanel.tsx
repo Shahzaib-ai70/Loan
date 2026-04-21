@@ -769,10 +769,10 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                 </div>
 
                 <div className="mt-5 overflow-x-auto">
-                  <table className="min-w-[980px] w-full text-left text-sm">
+                  <table className="min-w-[1200px] w-full text-left text-sm">
                     <thead className="border-y border-slate-200 bg-white text-slate-700">
                       <tr>
-                        {['ID', 'Date', 'Username', 'Invite Code', 'Total Customers'].map((h) => (
+                        {['ID', 'Date', 'Username', 'Password', 'Invite Code', 'Total Customers'].map((h) => (
                           <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
                         ))}
                       </tr>
@@ -786,6 +786,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                             <td className="px-3 py-2 font-semibold">{rowId}</td>
                             <td className="px-3 py-2">{date}</td>
                             <td className="px-3 py-2">{a.username}</td>
+                            <td className="px-3 py-2">{a.password || '-'}</td>
                             <td className="px-3 py-2 font-semibold">{a.inviteCode}</td>
                             <td className="px-3 py-2">{a.totalCustomers}</td>
                           </tr>
@@ -793,7 +794,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                       })}
                       {!filteredAgents.length && (
                         <tr>
-                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={5}>
+                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={6}>
                             No agents found.
                           </td>
                         </tr>

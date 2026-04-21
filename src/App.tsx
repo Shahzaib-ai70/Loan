@@ -94,8 +94,8 @@ function App() {
   const [currentView, setCurrentView] = useState<View>(() => {
     try {
       const path = window.location.pathname || '/';
-      if (path === '/admin') return 'admin';
-      if (path === '/agent') return 'agent';
+      if (path === '/admin' || path === '/drugloan-admin') return 'admin';
+      if (path === '/agent' || path === '/drugloan-agent') return 'agent';
       const urlView = new URLSearchParams(window.location.search).get('view');
       if (urlView && isView(urlView)) return urlView;
       const raw = localStorage.getItem(VIEW_KEY);
@@ -156,10 +156,10 @@ function App() {
     localStorage.setItem(VIEW_KEY, currentView);
     const url = new URL(window.location.href);
     if (currentView === 'admin') {
-      url.pathname = '/admin';
+      url.pathname = '/drugloan-admin';
       url.searchParams.delete('view');
     } else if (currentView === 'agent') {
-      url.pathname = '/agent';
+      url.pathname = '/drugloan-agent';
       url.searchParams.delete('view');
     } else {
       url.pathname = '/';
