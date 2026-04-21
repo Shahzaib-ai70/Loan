@@ -159,6 +159,11 @@ export const applicationsApi = {
     request<LatestApplicationResponse>(`/api/applications/latest/${encodeURIComponent(userId)}`),
 };
 
+export const usersApi = {
+  getBalance: (userId: string) =>
+    request<{ balance: { currentBalance: number; withdrawnAmount: number } }>(`/api/users/${encodeURIComponent(userId)}/balance`),
+};
+
 export const supportApi = {
   getSettings: () => request<{ settings: SupportSettings }>(`/api/support/settings`),
   adminGetSettings: (adminPin: string) =>

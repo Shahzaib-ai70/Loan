@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
-import { applicationsApi } from '../lib/api';
+import { applicationsApi, usersApi } from '../lib/api';
 import { getCurrentUser, getLatestApplicationForUser, getUserBalance, setUserBalance, upsertApplication } from '../lib/db';
 
 type WithdrawPageProps = {
@@ -35,12 +35,16 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
 
   useEffect(() => {
     if (!user) return;
-    applicationsApi
-      .getLatest(user.id)
-      .then((res) => {
+    Promise.allSettled([
+      applicationsApi.getLatest(user.id).then((res) => {
         if (res.application) upsertApplication(res.application as never);
-        setRefreshKey((x) => x + 1);
-      })
+      }),
+      usersApi.getBalance(user.id).then((res) => {
+        setUserBalance(user.id, res.balance);
+        setSnapshot(res.balance);
+      }),
+    ])
+      .then(() => setRefreshKey((x) => x + 1))
       .catch(() => {});
   }, [user?.id]);
 

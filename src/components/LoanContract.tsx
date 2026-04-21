@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeft, Printer } from 'lucide-react';
-import { getCurrentUser, getLatestApplicationForUser, getUserBalance } from '../lib/db';
+import { usersApi } from '../lib/api';
+import { getCurrentUser, getLatestApplicationForUser, getUserBalance, setUserBalance } from '../lib/db';
 
 type LoanContractProps = {
   onBack: () => void;
@@ -65,7 +66,18 @@ export function LoanContract({ onBack }: LoanContractProps) {
     );
   }
 
-  const balance = getUserBalance(app.userId);
+  const [balance, setBalance] = useState(() => getUserBalance(app.userId));
+
+  useEffect(() => {
+    if (!user || !app) return;
+    usersApi
+      .getBalance(user.id)
+      .then((res) => {
+        setUserBalance(user.id, res.balance);
+        setBalance(res.balance);
+      })
+      .catch(() => {});
+  }, [app.id, user.id]);
   const contractNo = `${app.id}-${String(app.submittedAt).slice(-6)}`;
 
   return (
