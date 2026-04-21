@@ -379,6 +379,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4">
             <div className="text-3xl font-light text-slate-500">≡</div>
             <div className="flex items-center gap-4 text-sm">
+              {syncing && <span className="font-semibold text-slate-500">Syncing…</span>}
               <span className="font-semibold text-slate-500">Operator: Pablo</span>
               <Button className="h-8 rounded bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700" onClick={logout}>
                 Logout
