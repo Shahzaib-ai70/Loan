@@ -39,6 +39,41 @@ export type AdminLoginResponse = {
   adminPin: string;
 };
 
+export type ApiSession = {
+  isLoggedIn: boolean;
+  userId: string;
+  lastLoginAt: number;
+};
+
+export type ApiUser = {
+  id: string;
+  gender: string;
+  phoneOrEmail: string;
+  createdAt: number;
+  lastApplicationId?: string;
+};
+
+export type AdminOverviewResponse = {
+  users: ApiUser[];
+  applications: unknown[];
+  balances: Record<string, { currentBalance: number; withdrawnAmount: number }>;
+};
+
+export type AuthRegisterResponse = {
+  user: ApiUser;
+  session: ApiSession;
+};
+
+export type AuthLoginResponse = {
+  user: ApiUser;
+  latestApplication: unknown | null;
+  session: ApiSession;
+};
+
+export type CreateApplicationResponse = {
+  application: unknown;
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -86,6 +121,20 @@ export const chatApi = {
 export const adminApi = {
   login: (params: { pin?: string; username?: string; password?: string }) =>
     request<AdminLoginResponse>(`/api/admin/login`, { method: 'POST', body: JSON.stringify(params) }),
+  getOverview: (adminPin: string) =>
+    request<AdminOverviewResponse>(`/api/admin/overview`, { headers: { 'x-admin-pin': adminPin } }),
+};
+
+export const authApi = {
+  register: (params: { gender: string; phoneOrEmail: string; password: string; inviteCode: string }) =>
+    request<AuthRegisterResponse>(`/api/auth/register`, { method: 'POST', body: JSON.stringify(params) }),
+  login: (params: { loginId: string; password: string }) =>
+    request<AuthLoginResponse>(`/api/auth/login`, { method: 'POST', body: JSON.stringify(params) }),
+};
+
+export const applicationsApi = {
+  create: (payload: unknown) =>
+    request<CreateApplicationResponse>(`/api/applications`, { method: 'POST', body: JSON.stringify(payload) }),
 };
 
 export const supportApi = {

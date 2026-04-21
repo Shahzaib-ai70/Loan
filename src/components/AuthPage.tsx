@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
-import { findUserByLogin, setSession } from '../lib/db';
+import { authApi } from '../lib/api';
+import { setSession, upsertApplication, upsertUser } from '../lib/db';
 
 type AuthPageProps = {
   onLogin: () => void;
@@ -36,28 +37,27 @@ export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
       return;
     }
 
-    const user = findUserByLogin(loginId);
-    if (!user) {
-      setError('No account found. Please register first.');
-      return;
-    }
-    if (user.disabledLogin) {
-      setError('Login disabled by admin. Please contact customer service.');
-      return;
-    }
-
-    const idMatches = user.phoneOrEmail.trim().toLowerCase() === loginId.trim().toLowerCase();
-    const passMatches = user.password === password;
-    if (!idMatches || !passMatches) {
-      setError('Invalid login details.');
-      return;
-    }
-
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setSession({ isLoggedIn: true, userId: user.id, lastLoginAt: Date.now() });
-    setLoading(false);
-    onLogin();
+    try {
+      const res = await authApi.login({ loginId, password });
+      upsertUser({
+        id: res.user.id,
+        gender: res.user.gender as 'Male' | 'Female',
+        phoneOrEmail: res.user.phoneOrEmail,
+        password,
+        inviteCode: '',
+        createdAt: res.user.createdAt,
+        lastApplicationId: res.user.lastApplicationId,
+        disabledLogin: false,
+      });
+      if (res.latestApplication) upsertApplication(res.latestApplication as never);
+      setSession(res.session);
+      setLoading(false);
+      onLogin();
+    } catch (e) {
+      setLoading(false);
+      setError(e instanceof Error ? e.message : 'Invalid login details.');
+    }
   };
 
   return (

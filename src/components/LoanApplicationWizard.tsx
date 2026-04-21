@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
 import { SignaturePad } from './SignaturePad';
+import { applicationsApi } from '../lib/api';
 import { findApplicationByIdCardNumber, getCurrentUser, upsertApplication } from '../lib/db';
 
 type LoanApplicationWizardProps = {
@@ -301,10 +302,11 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
         },
       };
 
-      upsertApplication(app);
+      const created = await applicationsApi.create(app);
+      upsertApplication(created.application as never);
       onSubmitted();
-    } catch {
-      setError('Unable to save application. Please try again.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save application. Please try again.');
     }
   };
 

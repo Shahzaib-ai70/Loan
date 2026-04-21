@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Eye, KeyRound, Pencil, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
@@ -37,6 +37,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   const [section, setSection] = useState<Section>('dashboard');
   const [usernameFilter, setUsernameFilter] = useState('');
   const [perPage, setPerPage] = useState(50);
@@ -75,6 +76,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     return list;
   }, [apps]);
 
+  const latestAppByUserId = useMemo(() => {
+    const map: Record<string, Application> = {};
+    for (const app of latestAppsPerUser) map[app.userId] = app;
+    return map;
+  }, [latestAppsPerUser]);
+
   const filteredApps = useMemo(() => {
     const normalized = usernameFilter.trim().toLowerCase();
     const result = latestAppsPerUser.filter((app) => {
@@ -85,6 +92,20 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     });
     return result.slice(0, perPage);
   }, [dbSnapshot.users, latestAppsPerUser, perPage, usernameFilter]);
+
+  const filteredUsers = useMemo(() => {
+    const normalized = usernameFilter.trim().toLowerCase();
+    const list = users
+      .slice()
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+      .filter((u) => {
+        if (!normalized) return true;
+        const app = latestAppByUserId[u.id];
+        const text = `${u.phoneOrEmail ?? ''} ${app?.applicant?.fullName ?? ''}`.toLowerCase();
+        return text.includes(normalized);
+      });
+    return list.slice(0, perPage);
+  }, [latestAppByUserId, perPage, usernameFilter, users]);
 
   const ensureUserForApp = (app: Application): User => {
     const db = getDb();
@@ -104,6 +125,39 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     return placeholder;
   };
 
+  const syncFromServer = async (pinValue?: string) => {
+    const adminPin = (pinValue ?? getDb().admin.pin).trim();
+    if (!adminPin) return;
+    setSyncing(true);
+    setError('');
+    try {
+      const overview = await adminApi.getOverview(adminPin);
+      for (const u of overview.users) {
+        upsertUser({
+          id: u.id,
+          gender: (u.gender as User['gender']) || 'Male',
+          phoneOrEmail: u.phoneOrEmail,
+          password: '',
+          inviteCode: '',
+          createdAt: u.createdAt,
+          lastApplicationId: u.lastApplicationId,
+          disabledLogin: false,
+        });
+      }
+      for (const a of overview.applications) {
+        upsertApplication(a as Application);
+      }
+      for (const [userId, balance] of Object.entries(overview.balances || {})) {
+        setUserBalance(userId, balance);
+      }
+      setRefreshKey((x) => x + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load admin data.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const login = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -112,11 +166,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       setAdminPin(res.adminPin);
       setAdminSession(true);
       setPassword('');
-      setRefreshKey((x) => x + 1);
+      await syncFromServer(res.adminPin);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid admin login.');
     }
   };
+
+  useEffect(() => {
+    if (!adminLoggedIn) return;
+    syncFromServer();
+  }, [adminLoggedIn]);
 
   const logout = () => {
     setAdminSession(false);
@@ -374,33 +433,46 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredApps.map((app, idx) => {
-                        const u = dbSnapshot.users[app.userId];
-                        const rowId = Number(String(app.id).replace(/\D/g, '').slice(-4) || idx + 1000);
-                        const date = new Date(app.submittedAt).toLocaleDateString();
-                        const code = app.withdrawCode || '';
+                      {filteredUsers.map((u, idx) => {
+                        const app = latestAppByUserId[u.id];
+                        const rowId = Number(String(u.id).replace(/\D/g, '').slice(-4) || idx + 1000);
+                        const date = new Date(u.createdAt).toLocaleDateString();
+                        const code = app?.withdrawCode || '';
                         return (
-                          <tr key={app.id} className="border-b border-slate-100">
+                          <tr key={u.id} className="border-b border-slate-100">
                             <td className="px-3 py-2 font-semibold">{rowId}</td>
                             <td className="px-3 py-2">{date}</td>
-                            <td className="px-3 py-2">{app.bank.accountNumber || '-'}</td>
-                            <td className="px-3 py-2">{app.applicant.fullName || '-'}</td>
+                            <td className="px-3 py-2">{app?.bank?.accountNumber || '-'}</td>
+                            <td className="px-3 py-2">{app?.applicant?.fullName || '-'}</td>
                             <td className="px-3 py-2">{u?.inviteCode || '-'}</td>
                             <td className="px-3 py-2">OM</td>
                             <td className="px-3 py-2">
-                              <Button className="h-8 rounded bg-slate-200 px-3 text-xs font-bold text-slate-800 hover:bg-slate-300" onClick={() => { setPinModalAppId(app.id); setPinCode(code); }}>
-                                PIN Code
-                              </Button>
+                              {app ? (
+                                <Button
+                                  className="h-8 rounded bg-slate-200 px-3 text-xs font-bold text-slate-800 hover:bg-slate-300"
+                                  onClick={() => {
+                                    setPinModalAppId(app.id);
+                                    setPinCode(code);
+                                  }}
+                                >
+                                  PIN Code
+                                </Button>
+                              ) : (
+                                <span className="text-xs font-semibold text-slate-500">-</span>
+                              )}
                             </td>
                             <td className="px-3 py-2">{code || '-'}</td>
                             <td className="px-3 py-2">
                               <div className="flex flex-wrap gap-2">
-                                <Button type="button" className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700" onClick={() => openEdit(app.id)}>
-                                  <Eye className="mr-1 h-3 w-3" /> View/Edit
-                                </Button>
+                                {app && (
+                                  <Button type="button" className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700" onClick={() => openEdit(app.id)}>
+                                    <Eye className="mr-1 h-3 w-3" /> View/Edit
+                                  </Button>
+                                )}
                                 <Button type="button" className="h-8 rounded bg-slate-600 px-2 text-xs font-bold text-white hover:bg-slate-700" onClick={() => {
                                   const db = getDb();
-                                  const user = db.users[app.userId] ?? ensureUserForApp(app);
+                                  const user = db.users[u.id];
+                                  if (!user) return;
                                   const next = prompt('Enter new invite code', user.inviteCode || '') ?? user.inviteCode;
                                   upsertUser({ ...user, inviteCode: next });
                                   setRefreshKey((x) => x + 1);
@@ -408,12 +480,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                   <KeyRound className="mr-1 h-3 w-3" /> Edit Invite Code
                                 </Button>
                                 <Button type="button" className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700" onClick={() => {
-                                  setPasswordModalUserId(app.userId);
+                                  setPasswordModalUserId(u.id);
                                   setNewPassword('');
                                 }}>
                                   <KeyRound className="mr-1 h-3 w-3" /> Change Password
                                 </Button>
-                                <Button type="button" className="h-8 rounded bg-teal-600 px-2 text-xs font-bold text-white hover:bg-teal-700" onClick={() => toggleDisableLogin(app.userId)}>
+                                <Button type="button" className="h-8 rounded bg-teal-600 px-2 text-xs font-bold text-white hover:bg-teal-700" onClick={() => toggleDisableLogin(u.id)}>
                                   <Users className="mr-1 h-3 w-3" /> {u?.disabledLogin ? 'Enable Login' : 'Disable Login'}
                                 </Button>
                               </div>

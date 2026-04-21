@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { CheckCircle2, ChevronRight, LockKeyhole, Smartphone } from 'lucide-react';
 import { Button } from './ui/Button';
-import { findUserByLogin, setSession, upsertUser, type Gender } from '../lib/db';
+import { authApi } from '../lib/api';
+import { setSession, upsertUser, type Gender } from '../lib/db';
 
 type RegisterFormData = {
   gender: Gender;
@@ -40,7 +41,7 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setSubmitted(false);
@@ -62,24 +63,31 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
       return;
     }
 
-    const existing = findUserByLogin(formData.phoneOrEmail);
-    if (existing) {
-      setError('You have already applied for a loan. Please login.');
-      return;
-    }
-
     setSubmitted(true);
-    const user = {
-      id: `USR-${Date.now().toString(36)}`,
-      gender: formData.gender,
-      phoneOrEmail: formData.phoneOrEmail.trim(),
-      password: formData.password,
-      inviteCode: formData.inviteCode.trim(),
-      createdAt: Date.now(),
-    };
-    upsertUser(user);
-    setSession({ isLoggedIn: true, userId: user.id, lastLoginAt: Date.now() });
-    window.setTimeout(() => onRegistered(), 600);
+    try {
+      const res = await authApi.register({
+        gender: formData.gender,
+        phoneOrEmail: formData.phoneOrEmail.trim(),
+        password: formData.password,
+        inviteCode: formData.inviteCode.trim(),
+      });
+      upsertUser({
+        id: res.user.id,
+        gender: res.user.gender as Gender,
+        phoneOrEmail: res.user.phoneOrEmail,
+        password: formData.password,
+        inviteCode: formData.inviteCode.trim(),
+        createdAt: res.user.createdAt,
+        lastApplicationId: res.user.lastApplicationId,
+        disabledLogin: false,
+      });
+      setSession(res.session);
+      window.setTimeout(() => onRegistered(), 600);
+    } catch (e) {
+      setSubmitted(false);
+      const msg = e instanceof Error ? e.message : 'Unable to create account.';
+      setError(msg.includes('Account already exists') ? 'You have already applied for a loan. Please login.' : msg);
+    }
   };
 
   const handleSubscribe = () => {
