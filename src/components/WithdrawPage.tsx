@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
-import { getCurrentUser, getLatestApplicationForUser, getUserBalance, setUserBalance } from '../lib/db';
+import { applicationsApi } from '../lib/api';
+import { getCurrentUser, getLatestApplicationForUser, getUserBalance, setUserBalance, upsertApplication } from '../lib/db';
 
 type WithdrawPageProps = {
   onNavigate: (to: 'dashboard' | 'withdraw' | 'application-status' | 'auth' | 'register' | 'loan-application' | 'admin') => void;
@@ -11,9 +12,13 @@ type WithdrawPageProps = {
 const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
+  const [refreshKey, setRefreshKey] = useState(0);
   const user = useMemo(() => getCurrentUser(), []);
-  const app = useMemo(() => (user ? getLatestApplicationForUser(user.id) : null), [user]);
-  const balance = useMemo(() => (user ? getUserBalance(user.id) : { currentBalance: 0, withdrawnAmount: 0 }), [user]);
+  const app = useMemo(() => (user ? getLatestApplicationForUser(user.id) : null), [refreshKey, user?.id]);
+  const balance = useMemo(
+    () => (user ? getUserBalance(user.id) : { currentBalance: 0, withdrawnAmount: 0 }),
+    [refreshKey, user?.id],
+  );
 
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -27,6 +32,17 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   const status = app?.status ?? 'under_review';
   const approved = status === 'approved';
   const rejected = status === 'rejected';
+
+  useEffect(() => {
+    if (!user) return;
+    applicationsApi
+      .getLatest(user.id)
+      .then((res) => {
+        if (res.application) upsertApplication(res.application as never);
+        setRefreshKey((x) => x + 1);
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user || !app) return;

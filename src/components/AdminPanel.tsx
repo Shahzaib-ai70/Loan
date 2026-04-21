@@ -30,7 +30,11 @@ type Section = 'dashboard' | 'customers' | 'loans' | 'support' | 'agents';
 const card = 'rounded-sm border border-slate-200 bg-white';
 const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-[#0b4a90]';
 const BLOCKED_NOTICE_KEY = 'take_easy_loan_blocked_notice';
+const ADMIN_SECTION_KEY = 'take_easy_loan_admin_section';
 const TERM_OPTIONS: number[] = [3, 6, 12, 24, 36, 48, 60, 90, 120];
+
+const isSection = (value: string): value is Section =>
+  ['dashboard', 'customers', 'loans', 'support', 'agents'].includes(value);
 
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [username, setUsername] = useState('admin');
@@ -38,7 +42,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  const [section, setSection] = useState<Section>('dashboard');
+  const [section, setSection] = useState<Section>(() => {
+    try {
+      const urlSection = new URLSearchParams(window.location.search).get('adminSection');
+      if (urlSection && isSection(urlSection)) return urlSection;
+      const raw = localStorage.getItem(ADMIN_SECTION_KEY);
+      return raw && isSection(raw) ? raw : 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
   const [usernameFilter, setUsernameFilter] = useState('');
   const [perPage, setPerPage] = useState(50);
   const [pinModalAppId, setPinModalAppId] = useState<string | null>(null);
@@ -176,6 +189,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (!adminLoggedIn) return;
     syncFromServer();
   }, [adminLoggedIn]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ADMIN_SECTION_KEY, section);
+      const url = new URL(window.location.href);
+      url.searchParams.set('adminSection', section);
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+    }
+  }, [section]);
 
   const logout = () => {
     setAdminSession(false);
@@ -659,12 +682,30 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
               onClick={() => {
                 if (!pinModalAppId) return;
+                const nextCode = pinCode.trim();
+                if (nextCode && nextCode.length !== 6) {
+                  setError('Withdrawal code must be 6 digits.');
+                  return;
+                }
                 const db = getDb();
                 const app = db.applications[pinModalAppId];
                 if (!app) return;
-                upsertApplication({ ...app, withdrawCode: pinCode.trim() });
-                setRefreshKey((x) => x + 1);
-                setPinModalAppId(null);
+                const adminPin = getDb().admin.pin.trim();
+                if (!adminPin) return;
+                setError('');
+                adminApi
+                  .updateApplication(adminPin, pinModalAppId, { withdrawCode: nextCode || undefined })
+                  .then((res) => {
+                    upsertApplication(res.application as Application);
+                    return syncFromServer(adminPin);
+                  })
+                  .then(() => {
+                    setRefreshKey((x) => x + 1);
+                    setPinModalAppId(null);
+                  })
+                  .catch((e) => {
+                    setError(e instanceof Error ? e.message : 'Unable to update withdrawal code.');
+                  });
               }}
             >
               Update
