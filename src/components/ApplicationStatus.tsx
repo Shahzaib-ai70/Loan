@@ -1,17 +1,31 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Clock, FileText, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
-import { getCurrentUser, getLatestApplicationForUser } from '../lib/db';
+import { applicationsApi } from '../lib/api';
+import { getCurrentUser, getLatestApplicationForUser, upsertApplication } from '../lib/db';
 
 type ApplicationStatusProps = {
   onStartNew: () => void;
 };
 
 export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
+  const [refreshKey, setRefreshKey] = useState(0);
   const application = useMemo(() => {
     const user = getCurrentUser();
     if (!user) return null;
     return getLatestApplicationForUser(user.id);
+  }, [refreshKey]);
+
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!user) return;
+    applicationsApi
+      .getLatest(user.id)
+      .then((res) => {
+        if (res.application) upsertApplication(res.application as never);
+        setRefreshKey((x) => x + 1);
+      })
+      .catch(() => {});
   }, []);
 
   if (!application) {
@@ -160,7 +174,17 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Button
             className="h-11 rounded-lg bg-[#0b4a90] px-6 text-sm font-extrabold text-white hover:bg-[#093b74]"
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              const user = getCurrentUser();
+              if (!user) return;
+              applicationsApi
+                .getLatest(user.id)
+                .then((res) => {
+                  if (res.application) upsertApplication(res.application as never);
+                  setRefreshKey((x) => x + 1);
+                })
+                .catch(() => {});
+            }}
           >
             Refresh
           </Button>

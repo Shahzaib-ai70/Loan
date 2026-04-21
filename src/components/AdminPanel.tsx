@@ -215,7 +215,9 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     const totalRepayment = amount + totalInterest;
     const monthlyPayment = termMonths ? totalRepayment / termMonths : 0;
 
-    upsertApplication({
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    const nextApp = {
       ...app,
       loan: {
         ...app.loan,
@@ -225,9 +227,20 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
         totalInterest,
         totalRepayment,
       },
-    });
-    setRefreshKey((x) => x + 1);
-    setEditLoanAppId(null);
+    };
+    setError('');
+    adminApi
+      .updateApplication(adminPin, editLoanAppId, { loan: nextApp.loan })
+      .then((res) => {
+        upsertApplication(res.application as Application);
+        return syncFromServer(adminPin);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to save loan.');
+      })
+      .finally(() => {
+        setEditLoanAppId(null);
+      });
   };
 
   const openStatusModal = (appId: string) => {
@@ -248,22 +261,28 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (!app) return;
     const nextStatus = statusValue;
     const wasApproved = app.status === 'approved';
-    upsertApplication({
-      ...app,
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    const patch = {
       status: nextStatus,
       statusLabel: statusLabel.trim() || undefined,
       statusNote: statusNote.trim() || undefined,
       approvedAt: nextStatus === 'approved' ? Date.now() : undefined,
-    });
-    if (nextStatus === 'approved' && !wasApproved) {
-      const b = getUserBalance(app.userId);
-      setUserBalance(app.userId, {
-        currentBalance: app.loan.amount,
-        withdrawnAmount: b.withdrawnAmount,
+    };
+    setError('');
+    adminApi
+      .updateApplication(adminPin, statusModalAppId, patch)
+      .then(async (res) => {
+        upsertApplication(res.application as Application);
+        if (nextStatus === 'approved' && !wasApproved) {
+          await adminApi.setUserBalance(adminPin, app.userId, Number(app.loan.amount) || 0);
+        }
+        await syncFromServer(adminPin);
+        setStatusModalAppId(null);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to update status.');
       });
-    }
-    setRefreshKey((x) => x + 1);
-    setStatusModalAppId(null);
   };
 
   const openAdjustModal = (userId: string) => {
@@ -280,9 +299,19 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       currentBalance: Math.max(0, b.currentBalance + delta),
       withdrawnAmount: b.withdrawnAmount,
     };
-    setUserBalance(adjustModalUserId, next);
-    setRefreshKey((x) => x + 1);
-    setAdjustAmount('');
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    setError('');
+    adminApi
+      .setUserBalance(adminPin, adjustModalUserId, next.currentBalance)
+      .then(() => {
+        setUserBalance(adjustModalUserId, next);
+        setRefreshKey((x) => x + 1);
+        setAdjustAmount('');
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to update balance.');
+      });
   };
 
   const toggleDisableLogin = (userId: string) => {

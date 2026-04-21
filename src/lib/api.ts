@@ -74,6 +74,10 @@ export type CreateApplicationResponse = {
   application: unknown;
 };
 
+export type LatestApplicationResponse = {
+  application: unknown | null;
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -123,6 +127,18 @@ export const adminApi = {
     request<AdminLoginResponse>(`/api/admin/login`, { method: 'POST', body: JSON.stringify(params) }),
   getOverview: (adminPin: string) =>
     request<AdminOverviewResponse>(`/api/admin/overview`, { headers: { 'x-admin-pin': adminPin } }),
+  updateApplication: (adminPin: string, appId: string, patch: unknown) =>
+    request<{ application: unknown }>(`/api/admin/applications/${encodeURIComponent(appId)}`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify(patch),
+    }),
+  setUserBalance: (adminPin: string, userId: string, currentBalance: number) =>
+    request<{ ok: boolean }>(`/api/users/${encodeURIComponent(userId)}/balance`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify({ currentBalance }),
+    }),
 };
 
 export const authApi = {
@@ -135,6 +151,8 @@ export const authApi = {
 export const applicationsApi = {
   create: (payload: unknown) =>
     request<CreateApplicationResponse>(`/api/applications`, { method: 'POST', body: JSON.stringify(payload) }),
+  getLatest: (userId: string) =>
+    request<LatestApplicationResponse>(`/api/applications/latest/${encodeURIComponent(userId)}`),
 };
 
 export const supportApi = {
