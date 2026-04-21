@@ -123,7 +123,7 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
               type="password"
               className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
             />
-            <Button className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">
+            <Button type="submit" className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">
               Login
             </Button>
             <Button type="button" variant="outline" className="h-11 w-full rounded-lg text-sm font-extrabold" onClick={onBack}>
