@@ -1,0 +1,268 @@
+import { useState, type FormEvent } from 'react';
+import { CheckCircle2, ChevronRight, LockKeyhole, Smartphone } from 'lucide-react';
+import { Button } from './ui/Button';
+import { findUserByLogin, setSession, upsertUser, type Gender } from '../lib/db';
+
+type RegisterFormData = {
+  gender: Gender;
+  phoneOrEmail: string;
+  password: string;
+  confirmPassword: string;
+  inviteCode: string;
+};
+
+type LoanApplicationFormProps = {
+  onRegistered: () => void;
+  onLogin: () => void;
+};
+
+const SUPPORT_LINKS = [
+  'Exchange Rates',
+  'Savings Book Lookup',
+  'Deposit Interest Rates',
+  'Fee Schedule',
+];
+
+export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFormProps) {
+  const [formData, setFormData] = useState<RegisterFormData>({
+    gender: 'Male',
+    phoneOrEmail: '',
+    password: '',
+    confirmPassword: '',
+    inviteCode: '',
+  });
+  const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [subscribeEmail, setSubscribeEmail] = useState('');
+  const [subscribeMessage, setSubscribeMessage] = useState('');
+
+  const updateField = <K extends keyof RegisterFormData>(key: K, value: RegisterFormData[K]) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    setSubmitted(false);
+
+    if (!formData.phoneOrEmail.trim()) {
+      setError('Mobile Phone OR Email is required.');
+      return;
+    }
+    if (!formData.password.trim() || formData.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError('Confirm Password does not match.');
+      return;
+    }
+    if (!formData.inviteCode.trim()) {
+      setError('Invite Code is required.');
+      return;
+    }
+
+    const existing = findUserByLogin(formData.phoneOrEmail);
+    if (existing) {
+      setError('You have already applied for a loan. Please login.');
+      return;
+    }
+
+    setSubmitted(true);
+    const user = {
+      id: `USR-${Date.now().toString(36)}`,
+      gender: formData.gender,
+      phoneOrEmail: formData.phoneOrEmail.trim(),
+      password: formData.password,
+      inviteCode: formData.inviteCode.trim(),
+      createdAt: Date.now(),
+    };
+    upsertUser(user);
+    setSession({ isLoggedIn: true, userId: user.id, lastLoginAt: Date.now() });
+    window.setTimeout(() => onRegistered(), 600);
+  };
+
+  const handleSubscribe = () => {
+    if (!subscribeEmail.trim()) {
+      setSubscribeMessage('Please enter your email.');
+      return;
+    }
+    setSubscribeMessage('Successfully subscribed. Thank you!');
+    setSubscribeEmail('');
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-6xl space-y-8">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+        <div className="mb-4 text-sm text-slate-500">
+          <span className="font-semibold text-slate-700">Home</span> <span className="mx-2">|</span>{' '}
+          <span className="font-semibold text-[#0b4a90]">Online Loan</span>
+        </div>
+
+        <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">Register for Online Loan</h1>
+        <p className="mt-1 text-sm text-slate-500">Contact Information</p>
+
+        {submitted && (
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
+            <CheckCircle2 className="h-4 w-4" />
+            Registration submitted successfully.
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {error}
+          </div>
+        )}
+
+        <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-12">
+            <label className="text-sm font-bold text-slate-700 sm:col-span-4">Title</label>
+            <div className="flex flex-wrap gap-4 sm:col-span-8">
+              {(['Male', 'Female'] as const).map((gender) => (
+                <label key={gender} className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="radio"
+                    name="gender"
+                    checked={formData.gender === gender}
+                    onChange={() => updateField('gender', gender)}
+                    className="h-4 w-4 accent-[#0b4a90]"
+                  />
+                  {gender}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-12">
+            <label className="text-sm font-bold text-slate-700 sm:col-span-4">Mobile Phone OR Email*</label>
+            <div className="sm:col-span-8">
+              <input
+                value={formData.phoneOrEmail}
+                onChange={(e) => updateField('phoneOrEmail', e.target.value)}
+                placeholder="Please enter phone or email"
+                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-12">
+            <label className="text-sm font-bold text-slate-700 sm:col-span-4">Password*</label>
+            <div className="sm:col-span-8">
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => updateField('password', e.target.value)}
+                placeholder="Please enter password"
+                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-12">
+            <label className="text-sm font-bold text-slate-700 sm:col-span-4">Confirm Password*</label>
+            <div className="sm:col-span-8">
+              <input
+                type="password"
+                value={formData.confirmPassword}
+                onChange={(e) => updateField('confirmPassword', e.target.value)}
+                placeholder="Please enter confirm password"
+                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-12">
+            <label className="text-sm font-bold text-slate-700 sm:col-span-4">Invite Code*</label>
+            <div className="sm:col-span-8">
+              <input
+                value={formData.inviteCode}
+                onChange={(e) => updateField('inviteCode', e.target.value)}
+                placeholder="Please enter invite code"
+                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 text-right">
+            <Button type="submit" className="h-11 rounded-md bg-[#e21b23] px-8 text-sm font-extrabold text-white hover:bg-[#c9161d]">
+              Submit
+            </Button>
+          </div>
+
+          <p className="text-sm text-slate-600">
+            Already have an account?{' '}
+            <button
+              type="button"
+              className="font-bold text-[#0b4a90] hover:underline"
+              onClick={onLogin}
+            >
+              Login
+            </button>
+          </p>
+        </form>
+
+        <div className="mt-7 border-t border-slate-200 pt-4 text-sm text-slate-500">
+          All customer personal information will be kept confidential
+        </div>
+      </div>
+
+      <section className="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-2">
+        <div className="bg-slate-50 p-6 sm:p-8">
+          <div className="flex items-center gap-3 text-[#0b4a90]">
+            <Smartphone className="h-6 w-6" />
+            <h3 className="text-xl font-extrabold">Our Loan App on Mobile Devices</h3>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
+            Manage your loan account, track status, and receive updates directly on your mobile.
+          </p>
+        </div>
+
+        <div className="bg-[#0b4a90] p-6 sm:p-8">
+          <h3 className="text-xl font-extrabold text-white">Subscribe for Loan Offers & Updates</h3>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={subscribeEmail}
+              onChange={(e) => setSubscribeEmail(e.target.value)}
+              placeholder="Your email..."
+              className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-sm outline-none"
+            />
+            <Button
+              type="button"
+              onClick={handleSubscribe}
+              className="h-11 rounded-lg bg-[#e21b23] px-6 text-sm font-extrabold text-white hover:bg-[#c9161d]"
+            >
+              Subscribe
+            </Button>
+          </div>
+          {subscribeMessage && <p className="mt-3 text-sm font-semibold text-white">{subscribeMessage}</p>}
+        </div>
+      </section>
+
+      <footer className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <h4 className="text-lg font-extrabold text-slate-900">Support</h4>
+            <ul className="mt-3 space-y-2">
+              {SUPPORT_LINKS.map((item) => (
+                <li key={item}>
+                  <a href="#" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#0b4a90]">
+                    {item} <ChevronRight className="h-4 w-4" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl bg-[#f8fbff] p-5 ring-1 ring-slate-200">
+            <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">HOTLINE</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-900">+1 773 322 9624</div>
+            <button className="mt-4 inline-flex items-center gap-2 rounded-md bg-[#e21b23] px-4 py-2 text-sm font-extrabold text-white hover:bg-[#c9161d]">
+              <LockKeyhole className="h-4 w-4" />
+              Electronic banking
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
