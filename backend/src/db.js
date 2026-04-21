@@ -23,6 +23,15 @@ export const initDb = () => {
       last_application_id TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      invite_code TEXT NOT NULL UNIQUE,
+      api_key TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS applications (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -74,6 +83,10 @@ export const initDb = () => {
   if (!colNames.has('username')) db.exec('ALTER TABLE admin_settings ADD COLUMN username TEXT');
   if (!colNames.has('password_salt')) db.exec('ALTER TABLE admin_settings ADD COLUMN password_salt TEXT');
   if (!colNames.has('password_hash')) db.exec('ALTER TABLE admin_settings ADD COLUMN password_hash TEXT');
+
+  const userCols = db.prepare('PRAGMA table_info(users)').all();
+  const userColNames = new Set(userCols.map((c) => c.name));
+  if (!userColNames.has('agent_id')) db.exec('ALTER TABLE users ADD COLUMN agent_id TEXT');
 
   const username = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
   const password = process.env.DEFAULT_ADMIN_PASSWORD || pin;

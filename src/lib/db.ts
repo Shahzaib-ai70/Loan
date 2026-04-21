@@ -8,6 +8,7 @@ export type User = {
   phoneOrEmail: string;
   password: string;
   inviteCode: string;
+  agentId?: string;
   disabledLogin?: boolean;
   createdAt: number;
   lastApplicationId?: string;

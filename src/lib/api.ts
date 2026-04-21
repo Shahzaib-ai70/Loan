@@ -55,9 +55,35 @@ export type ApiUser = {
   phoneOrEmail: string;
   createdAt: number;
   lastApplicationId?: string;
+  agentId?: string;
 };
 
 export type AdminOverviewResponse = {
+  users: ApiUser[];
+  applications: unknown[];
+  balances: Record<string, { currentBalance: number; withdrawnAmount: number }>;
+};
+
+export type AgentSummary = {
+  id: string;
+  username: string;
+  inviteCode: string;
+  createdAt: number;
+  totalCustomers: number;
+};
+
+export type AdminAgentsResponse = {
+  agents: AgentSummary[];
+};
+
+export type AgentLoginResponse = {
+  ok: boolean;
+  agentKey: string;
+  agent: { id: string; username: string; inviteCode: string; createdAt: number };
+};
+
+export type AgentOverviewResponse = {
+  agent: { id: string; username: string; inviteCode: string };
   users: ApiUser[];
   applications: unknown[];
   balances: Record<string, { currentBalance: number; withdrawnAmount: number }>;
@@ -131,6 +157,14 @@ export const adminApi = {
     request<AdminLoginResponse>(`/api/admin/login`, { method: 'POST', body: JSON.stringify(params) }),
   getOverview: (adminPin: string) =>
     request<AdminOverviewResponse>(`/api/admin/overview`, { headers: { 'x-admin-pin': adminPin } }),
+  getAgents: (adminPin: string) =>
+    request<AdminAgentsResponse>(`/api/admin/agents`, { headers: { 'x-admin-pin': adminPin } }),
+  createAgent: (adminPin: string, payload: { username: string; password: string; inviteCode: string }) =>
+    request<{ agent: AgentSummary }>(`/api/admin/agents`, {
+      method: 'POST',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify(payload),
+    }),
   updateApplication: (adminPin: string, appId: string, patch: unknown) =>
     request<{ application: unknown }>(`/api/admin/applications/${encodeURIComponent(appId)}`, {
       method: 'PUT',
@@ -143,6 +177,13 @@ export const adminApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ currentBalance }),
     }),
+};
+
+export const agentApi = {
+  login: (params: { username: string; password: string }) =>
+    request<AgentLoginResponse>(`/api/agent/login`, { method: 'POST', body: JSON.stringify(params) }),
+  getOverview: (agentKey: string) =>
+    request<AgentOverviewResponse>(`/api/agent/overview`, { headers: { 'x-agent-key': agentKey } }),
 };
 
 export const authApi = {

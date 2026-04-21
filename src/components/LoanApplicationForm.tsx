@@ -77,6 +77,7 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
         phoneOrEmail: res.user.phoneOrEmail,
         password: formData.password,
         inviteCode: formData.inviteCode.trim(),
+        agentId: res.user.agentId,
         createdAt: res.user.createdAt,
         lastApplicationId: res.user.lastApplicationId,
         disabledLogin: false,

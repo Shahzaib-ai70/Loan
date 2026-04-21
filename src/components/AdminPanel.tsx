@@ -3,7 +3,7 @@ import { Eye, KeyRound, Pencil, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
-import { adminApi, applicationsApi } from '../lib/api';
+import { adminApi, applicationsApi, type AgentSummary } from '../lib/api';
 import {
   type Application,
   type LoanStatus,
@@ -67,6 +67,13 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [statusNote, setStatusNote] = useState('');
   const [adjustModalUserId, setAdjustModalUserId] = useState<string | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
+  const [agents, setAgents] = useState<AgentSummary[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [agentUsername, setAgentUsername] = useState('');
+  const [agentPassword, setAgentPassword] = useState('');
+  const [agentInviteCode, setAgentInviteCode] = useState('');
+  const [agentSearch, setAgentSearch] = useState('');
 
   const adminLoggedIn = useMemo(() => isAdminLoggedIn(), [refreshKey]);
   const dbSnapshot = useMemo(() => getDb(), [refreshKey]);
@@ -120,6 +127,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     return list.slice(0, perPage);
   }, [latestAppByUserId, perPage, usernameFilter, users]);
 
+  const filteredAgents = useMemo(() => {
+    const normalized = agentSearch.trim().toLowerCase();
+    if (!normalized) return agents;
+    return agents.filter((a) => `${a.username} ${a.inviteCode}`.toLowerCase().includes(normalized));
+  }, [agentSearch, agents]);
+
   const ensureUserForApp = (app: Application): User => {
     const db = getDb();
     const existing = db.users[app.userId];
@@ -171,6 +184,47 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     }
   };
 
+  const loadAgents = async () => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    setAgentsLoading(true);
+    setError('');
+    try {
+      const res = await adminApi.getAgents(adminPin);
+      setAgents(res.agents || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load agents.');
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
+  const createAgent = async () => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    const u = agentUsername.trim();
+    const p = agentPassword;
+    const inv = agentInviteCode.trim();
+    if (!u || !p || !inv) {
+      setError('Username, password and invite code are required.');
+      return;
+    }
+    setAgentsLoading(true);
+    setError('');
+    try {
+      await adminApi.createAgent(adminPin, { username: u, password: p, inviteCode: inv });
+      setAgentModalOpen(false);
+      setAgentUsername('');
+      setAgentPassword('');
+      setAgentInviteCode('');
+      await loadAgents();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to create agent.');
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
   const login = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
@@ -189,6 +243,21 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (!adminLoggedIn) return;
     syncFromServer();
   }, [adminLoggedIn]);
+
+  useEffect(() => {
+    if (!adminLoggedIn) return;
+    if (section !== 'agents') return;
+    loadAgents();
+  }, [adminLoggedIn, section]);
+
+  useEffect(() => {
+    if (!adminLoggedIn) return;
+    const id = window.setInterval(() => {
+      syncFromServer();
+      if (section === 'agents') loadAgents();
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [adminLoggedIn, section]);
 
   useEffect(() => {
     try {
@@ -656,8 +725,82 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             )}
 
             {section === 'agents' && (
-              <div className={`${card} p-6 text-sm font-semibold text-slate-600`}>
-                Agents module placeholder.
+              <div className={`${card} p-4`}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-4xl font-semibold text-slate-800">Agents</h2>
+                    <div className="mt-1 text-sm font-semibold text-slate-500">Create agents and manage invitation codes.</div>
+                  </div>
+                  <Button
+                    type="button"
+                    className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700"
+                    onClick={() => {
+                      setAgentModalOpen(true);
+                      setAgentUsername('');
+                      setAgentPassword('');
+                      setAgentInviteCode('');
+                    }}
+                  >
+                    Add Agent
+                  </Button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1.2fr_auto_auto]">
+                  <div>
+                    <div className="mb-1 text-xs font-bold text-slate-700">Search</div>
+                    <input className={field} value={agentSearch} onChange={(e) => setAgentSearch(e.target.value)} placeholder="Search agent" />
+                  </div>
+                  <Button
+                    type="button"
+                    className="mt-5 h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700"
+                    onClick={loadAgents}
+                    disabled={agentsLoading}
+                  >
+                    {agentsLoading ? 'Loading…' : 'Refresh'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-5 h-9 rounded px-4 text-xs font-bold"
+                    onClick={() => setAgentSearch('')}
+                  >
+                    Reset
+                  </Button>
+                </div>
+
+                <div className="mt-5 overflow-x-auto">
+                  <table className="min-w-[980px] w-full text-left text-sm">
+                    <thead className="border-y border-slate-200 bg-white text-slate-700">
+                      <tr>
+                        {['ID', 'Date', 'Username', 'Invite Code', 'Total Customers'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAgents.map((a, idx) => {
+                        const rowId = Number(String(a.id).replace(/\D/g, '').slice(-4) || idx + 1000);
+                        const date = new Date(a.createdAt).toLocaleString();
+                        return (
+                          <tr key={a.id} className="border-b border-slate-100">
+                            <td className="px-3 py-2 font-semibold">{rowId}</td>
+                            <td className="px-3 py-2">{date}</td>
+                            <td className="px-3 py-2">{a.username}</td>
+                            <td className="px-3 py-2 font-semibold">{a.inviteCode}</td>
+                            <td className="px-3 py-2">{a.totalCustomers}</td>
+                          </tr>
+                        );
+                      })}
+                      {!filteredAgents.length && (
+                        <tr>
+                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={5}>
+                            No agents found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -729,6 +872,38 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               Update
             </Button>
             <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setPinModalAppId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={agentModalOpen} title="Add Agent" onClose={() => setAgentModalOpen(false)}>
+        <div className="space-y-4">
+          <input
+            value={agentUsername}
+            onChange={(e) => setAgentUsername(e.target.value)}
+            placeholder="Agent username"
+            className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]"
+          />
+          <input
+            value={agentPassword}
+            onChange={(e) => setAgentPassword(e.target.value)}
+            placeholder="Agent password"
+            type="password"
+            className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]"
+          />
+          <input
+            value={agentInviteCode}
+            onChange={(e) => setAgentInviteCode(e.target.value.replace(/\s+/g, '').slice(0, 24))}
+            placeholder="Invite code (unique)"
+            className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]"
+          />
+          <div className="flex gap-2">
+            <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={createAgent} disabled={agentsLoading}>
+              {agentsLoading ? 'Creating…' : 'Create'}
+            </Button>
+            <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setAgentModalOpen(false)}>
               Cancel
             </Button>
           </div>

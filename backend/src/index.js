@@ -37,12 +37,30 @@ const verifyAdminPassword = (username, password) => {
   return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(creds.passwordHash, 'hex'));
 };
 
+const getAgentByKey = (agentKey) => {
+  if (!agentKey) return null;
+  return db
+    .prepare('SELECT id, username, invite_code, api_key FROM agents WHERE api_key = ?')
+    .get(String(agentKey).trim());
+};
+
 const requireAdmin = (req, res, next) => {
   const pin = req.headers['x-admin-pin'];
   if (!pin || String(pin).trim() !== getAdminPin()) {
     res.status(401).json({ message: 'Invalid admin pin' });
     return;
   }
+  next();
+};
+
+const requireAgent = (req, res, next) => {
+  const key = req.headers['x-agent-key'];
+  const agent = getAgentByKey(key);
+  if (!agent) {
+    res.status(401).json({ message: 'Invalid agent session' });
+    return;
+  }
+  req.agent = agent;
   next();
 };
 
@@ -56,6 +74,16 @@ app.post('/api/auth/register', (req, res) => {
     res.status(400).json({ message: 'Phone/Email and password are required.' });
     return;
   }
+  const inv = String(inviteCode || '').trim();
+  if (!inv) {
+    res.status(400).json({ message: 'Invite Code is required.' });
+    return;
+  }
+  const agent = db.prepare('SELECT id FROM agents WHERE invite_code = ?').get(inv);
+  if (!agent) {
+    res.status(400).json({ message: 'Invalid invite code.' });
+    return;
+  }
 
   const exists = db
     .prepare('SELECT id FROM users WHERE lower(phone_or_email) = ?')
@@ -67,13 +95,13 @@ app.post('/api/auth/register', (req, res) => {
 
   const id = makeId('USR');
   db.prepare(
-    `INSERT INTO users (id, gender, phone_or_email, password, invite_code, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, gender, String(phoneOrEmail).trim(), String(password), String(inviteCode || ''), now());
+    `INSERT INTO users (id, gender, phone_or_email, password, invite_code, created_at, agent_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, gender, String(phoneOrEmail).trim(), String(password), inv, now(), agent.id);
   db.prepare('INSERT OR IGNORE INTO balances (user_id, current_balance, withdrawn_amount) VALUES (?, 0, 0)').run(id);
 
   res.json({
-    user: { id, gender, phoneOrEmail: String(phoneOrEmail).trim(), createdAt: now() },
+    user: { id, gender, phoneOrEmail: String(phoneOrEmail).trim(), createdAt: now(), agentId: agent.id },
     session: { isLoggedIn: true, userId: id, lastLoginAt: now() },
   });
 });
@@ -81,7 +109,7 @@ app.post('/api/auth/register', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { loginId = '', password = '' } = req.body || {};
   const user = db
-    .prepare('SELECT id, gender, phone_or_email, password, created_at, last_application_id FROM users WHERE lower(phone_or_email) = ?')
+    .prepare('SELECT id, gender, phone_or_email, password, created_at, last_application_id, agent_id FROM users WHERE lower(phone_or_email) = ?')
     .get(normalize(loginId));
   if (!user || user.password !== String(password)) {
     res.status(401).json({ message: 'Invalid login details.' });
@@ -100,6 +128,7 @@ app.post('/api/auth/login', (req, res) => {
       phoneOrEmail: user.phone_or_email,
       createdAt: user.created_at,
       lastApplicationId: user.last_application_id || undefined,
+      agentId: user.agent_id || undefined,
     },
     latestApplication,
     session: { isLoggedIn: true, userId: user.id, lastLoginAt: now() },
@@ -227,8 +256,32 @@ app.post('/api/admin/login', (req, res) => {
   res.json({ ok: true, adminPin: getAdminPin() });
 });
 
+app.post('/api/agent/login', (req, res) => {
+  const { username = '', password = '' } = req.body || {};
+  const u = String(username || '').trim();
+  const p = String(password || '');
+  if (!u || !p) {
+    res.status(400).json({ message: 'Username and password are required.' });
+    return;
+  }
+  const agent = db
+    .prepare('SELECT id, username, password, invite_code, api_key, created_at FROM agents WHERE lower(username) = ?')
+    .get(normalize(u));
+  if (!agent || String(agent.password) !== p) {
+    res.status(401).json({ message: 'Invalid agent login.' });
+    return;
+  }
+  res.json({
+    ok: true,
+    agentKey: agent.api_key,
+    agent: { id: agent.id, username: agent.username, inviteCode: agent.invite_code, createdAt: agent.created_at },
+  });
+});
+
 app.get('/api/admin/overview', requireAdmin, (_req, res) => {
-  const users = db.prepare('SELECT id, gender, phone_or_email, created_at, last_application_id FROM users ORDER BY created_at DESC').all();
+  const users = db
+    .prepare('SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id FROM users ORDER BY created_at DESC')
+    .all();
   const applicationsRows = db.prepare('SELECT payload_json FROM applications ORDER BY submitted_at DESC').all();
   const applications = applicationsRows.map((r) => JSON.parse(r.payload_json));
   const balancesRows = db.prepare('SELECT user_id, current_balance, withdrawn_amount FROM balances').all();
@@ -245,6 +298,92 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       phoneOrEmail: u.phone_or_email,
       createdAt: u.created_at,
       lastApplicationId: u.last_application_id,
+      agentId: u.agent_id || undefined,
+    })),
+    applications,
+    balances,
+  });
+});
+
+app.get('/api/admin/agents', requireAdmin, (_req, res) => {
+  const agents = db.prepare('SELECT id, username, invite_code, created_at FROM agents ORDER BY created_at DESC').all();
+  const counts = db
+    .prepare('SELECT agent_id, COUNT(*) as total FROM users WHERE agent_id IS NOT NULL GROUP BY agent_id')
+    .all();
+  const totals = Object.fromEntries(counts.map((c) => [c.agent_id, c.total]));
+  res.json({
+    agents: agents.map((a) => ({
+      id: a.id,
+      username: a.username,
+      inviteCode: a.invite_code,
+      createdAt: a.created_at,
+      totalCustomers: totals[a.id] || 0,
+    })),
+  });
+});
+
+app.post('/api/admin/agents', requireAdmin, (req, res) => {
+  const { username = '', password = '', inviteCode = '' } = req.body || {};
+  const u = String(username || '').trim();
+  const p = String(password || '');
+  const inv = String(inviteCode || '').trim();
+  if (!u || !p || !inv) {
+    res.status(400).json({ message: 'username, password and inviteCode are required.' });
+    return;
+  }
+  const existsU = db.prepare('SELECT id FROM agents WHERE lower(username) = ?').get(normalize(u));
+  if (existsU) {
+    res.status(409).json({ message: 'Agent username already exists.' });
+    return;
+  }
+  const existsI = db.prepare('SELECT id FROM agents WHERE invite_code = ?').get(inv);
+  if (existsI) {
+    res.status(409).json({ message: 'Invite code already exists.' });
+    return;
+  }
+  const id = makeId('AGT');
+  const apiKey = crypto.randomBytes(24).toString('hex');
+  db.prepare(
+    `INSERT INTO agents (id, username, password, invite_code, api_key, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, u, p, inv, apiKey, now());
+  res.json({ agent: { id, username: u, inviteCode: inv, createdAt: now() } });
+});
+
+app.get('/api/agent/overview', requireAgent, (req, res) => {
+  const agent = req.agent;
+  const users = db
+    .prepare('SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id FROM users WHERE agent_id = ? ORDER BY created_at DESC')
+    .all(agent.id);
+  const applicationsRows = db
+    .prepare(
+      `SELECT payload_json FROM applications
+       WHERE user_id IN (SELECT id FROM users WHERE agent_id = ?)
+       ORDER BY submitted_at DESC`,
+    )
+    .all(agent.id);
+  const applications = applicationsRows.map((r) => JSON.parse(r.payload_json));
+  const balancesRows = db
+    .prepare(
+      `SELECT user_id, current_balance, withdrawn_amount FROM balances
+       WHERE user_id IN (SELECT id FROM users WHERE agent_id = ?)`,
+    )
+    .all(agent.id);
+  const balances = Object.fromEntries(
+    balancesRows.map((b) => [
+      b.user_id,
+      { currentBalance: b.current_balance, withdrawnAmount: b.withdrawn_amount },
+    ]),
+  );
+  res.json({
+    agent: { id: agent.id, username: agent.username, inviteCode: agent.invite_code },
+    users: users.map((u) => ({
+      id: u.id,
+      gender: u.gender,
+      phoneOrEmail: u.phone_or_email,
+      createdAt: u.created_at,
+      lastApplicationId: u.last_application_id,
+      agentId: u.agent_id || undefined,
     })),
     applications,
     balances,

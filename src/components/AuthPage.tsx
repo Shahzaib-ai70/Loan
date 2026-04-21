@@ -3,7 +3,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
 import { authApi } from '../lib/api';
-import { setSession, upsertApplication, upsertUser } from '../lib/db';
+import { getDb, setSession, upsertApplication, upsertUser } from '../lib/db';
 
 type AuthPageProps = {
   onLogin: () => void;
@@ -40,12 +40,14 @@ export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
     setLoading(true);
     try {
       const res = await authApi.login({ loginId, password });
+      const existing = getDb().users[res.user.id];
       upsertUser({
         id: res.user.id,
         gender: res.user.gender as 'Male' | 'Female',
         phoneOrEmail: res.user.phoneOrEmail,
         password,
-        inviteCode: '',
+        inviteCode: existing?.inviteCode || '',
+        agentId: res.user.agentId,
         createdAt: res.user.createdAt,
         lastApplicationId: res.user.lastApplicationId,
         disabledLogin: false,
