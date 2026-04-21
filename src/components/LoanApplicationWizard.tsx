@@ -182,13 +182,48 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
     }));
   };
 
-  const readFileAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('file_read_failed'));
-      reader.readAsDataURL(file);
-    });
+  const readFileAsDataUrl = async (file: File): Promise<string> => {
+    const readRaw = () =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('file_read_failed'));
+        reader.readAsDataURL(file);
+      });
+
+    if (!file.type.startsWith('image/')) return readRaw();
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error('image_load_failed'));
+        el.src = objectUrl;
+      });
+      const maxDim = 900;
+      const w = img.naturalWidth || img.width || 0;
+      const h = img.naturalHeight || img.height || 0;
+      if (!w || !h) return readRaw();
+
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      const targetW = Math.max(1, Math.round(w * scale));
+      const targetH = Math.max(1, Math.round(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return readRaw();
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      if (!dataUrl || dataUrl === 'data:,') return readRaw();
+      return dataUrl;
+    } catch {
+      return readRaw();
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
 
   const goNext = () => {
     setError('');

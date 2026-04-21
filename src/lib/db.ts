@@ -105,6 +105,23 @@ const defaultDb = (): Db => ({
   },
 });
 
+const pruneHeavyDocuments = (app: Application, mode: 'light' | 'full'): Application => {
+  const nextDocs: Application['documents'] = { ...app.documents };
+  const front = String(nextDocs.idFrontDataUrl || '');
+  const back = String(nextDocs.idBackDataUrl || '');
+  const selfie = String(nextDocs.selfieHoldingIdDataUrl || '');
+  if (front.length > 80_000) nextDocs.idFrontDataUrl = undefined;
+  if (back.length > 80_000) nextDocs.idBackDataUrl = undefined;
+  if (selfie.length > 80_000) nextDocs.selfieHoldingIdDataUrl = undefined;
+  if (mode === 'full') {
+    nextDocs.signatureDataUrl = '';
+  } else {
+    const sig = String(nextDocs.signatureDataUrl || '');
+    if (sig.length > 120_000) nextDocs.signatureDataUrl = '';
+  }
+  return { ...app, documents: nextDocs };
+};
+
 export const getDb = (): Db => {
   try {
     const raw = localStorage.getItem(DB_KEY);
@@ -125,7 +142,27 @@ export const getDb = (): Db => {
 };
 
 export const saveDb = (db: Db) => {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : '';
+    const quota =
+      message.toLowerCase().includes('quota') ||
+      message.toLowerCase().includes('exceeded') ||
+      message.toLowerCase().includes('storage');
+    if (!quota) throw e;
+    try {
+      const pruned: Db = {
+        ...db,
+        applications: Object.fromEntries(
+          Object.entries(db.applications).map(([id, app]) => [id, pruneHeavyDocuments(app, 'full')]),
+        ),
+      };
+      localStorage.removeItem(DB_KEY);
+      localStorage.setItem(DB_KEY, JSON.stringify(pruned));
+    } catch {
+    }
+  }
 };
 
 export const ensureMigration = () => {
@@ -222,19 +259,16 @@ export const ensureMigration = () => {
 
     const docs = legacy.documents;
     if (docs && typeof docs === 'object') {
-      const setIfEmpty = (key: keyof Application['documents'], value: unknown) => {
-        const cur = (app.documents as Record<string, unknown>)[key as string];
-        if (cur) return;
-        if (typeof value === 'string' && value.startsWith('data:')) {
-          (app.documents as Record<string, unknown>)[key as string] = value;
-          changed = true;
-        }
-      };
-
-      setIfEmpty('idFrontDataUrl', docs.idFrontDataURL);
-      setIfEmpty('idBackDataUrl', docs.idBackDataURL);
-      setIfEmpty('selfieHoldingIdDataUrl', docs.selfieHoldingIdDataURL);
-      setIfEmpty('signatureDataUrl', docs.signatureDataURL);
+      const docObj = docs as Record<string, unknown>;
+      const front = String(docObj.idFrontDataUrl || docObj.idFrontDataURL || '');
+      const back = String(docObj.idBackDataUrl || docObj.idBackDataURL || '');
+      const selfie = String(docObj.selfieHoldingIdDataUrl || docObj.selfieHoldingIdDataURL || '');
+      const sig = String(docObj.signatureDataUrl || docObj.signatureDataURL || '');
+      const hasHeavy = front.length > 80_000 || back.length > 80_000 || selfie.length > 80_000 || sig.length > 120_000;
+      if (hasHeavy) {
+        db.applications[app.id] = pruneHeavyDocuments(app, 'light');
+        changed = true;
+      }
     }
   }
 
@@ -295,7 +329,7 @@ export const setUserBalance = (userId: string, balance: Balance) => {
 
 export const upsertApplication = (app: Application) => {
   const db = getDb();
-  db.applications[app.id] = app;
+  db.applications[app.id] = pruneHeavyDocuments(app, 'light');
   const user = db.users[app.userId];
   if (user) user.lastApplicationId = app.id;
   saveDb(db);
