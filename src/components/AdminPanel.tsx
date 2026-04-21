@@ -440,6 +440,11 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           </header>
 
           <div className="p-4">
+            {error && (
+              <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {error}
+              </div>
+            )}
             {section === 'dashboard' && (
               <>
                 <h2 className="mb-3 text-4xl font-semibold text-slate-800">Dashboard</h2>
@@ -691,7 +696,10 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                 const app = db.applications[pinModalAppId];
                 if (!app) return;
                 const adminPin = getDb().admin.pin.trim();
-                if (!adminPin) return;
+                if (!adminPin) {
+                  setError('Admin session expired. Please logout and login again.');
+                  return;
+                }
                 setError('');
                 adminApi
                   .updateApplication(adminPin, pinModalAppId, { withdrawCode: nextCode || undefined })
