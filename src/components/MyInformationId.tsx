@@ -11,15 +11,6 @@ const pillInput =
   'h-11 w-full rounded-full border border-[#0b4a90]/35 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none';
 const labelClass = 'text-sm font-bold text-slate-700';
 
-function KeyValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 py-2 text-sm">
-      <div className="font-bold text-slate-600">{label}</div>
-      <div className="text-right font-extrabold text-slate-900">{value || '-'}</div>
-    </div>
-  );
-}
-
 function ImgTile({
   title,
   src,
