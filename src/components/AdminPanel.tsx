@@ -3,7 +3,7 @@ import { Eye, KeyRound, Pencil, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
-import { adminApi } from '../lib/api';
+import { adminApi, applicationsApi } from '../lib/api';
 import {
   type Application,
   type LoanStatus,
@@ -685,7 +685,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           <div className="flex gap-2">
             <Button
               className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
-              onClick={() => {
+              onClick={async () => {
                 if (!pinModalAppId) return;
                 const nextCode = pinCode.trim();
                 if (nextCode && nextCode.length !== 6) {
@@ -701,19 +701,29 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   return;
                 }
                 setError('');
-                adminApi
-                  .updateApplication(adminPin, pinModalAppId, { withdrawCode: nextCode || undefined })
-                  .then((res) => {
-                    upsertApplication(res.application as Application);
-                    return syncFromServer(adminPin);
-                  })
-                  .then(() => {
-                    setRefreshKey((x) => x + 1);
-                    setPinModalAppId(null);
-                  })
-                  .catch((e) => {
-                    setError(e instanceof Error ? e.message : 'Unable to update withdrawal code.');
-                  });
+                try {
+                  const res = await adminApi.updateApplication(adminPin, pinModalAppId, { withdrawCode: nextCode || undefined });
+                  upsertApplication(res.application as Application);
+                  await syncFromServer(adminPin);
+                  setRefreshKey((x) => x + 1);
+                  setPinModalAppId(null);
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : 'Unable to update withdrawal code.';
+                  if (msg.toLowerCase().includes('application not found')) {
+                    try {
+                      const created = await applicationsApi.create({ ...app, withdrawCode: nextCode || undefined });
+                      upsertApplication(created.application as Application);
+                      await syncFromServer(adminPin);
+                      setRefreshKey((x) => x + 1);
+                      setPinModalAppId(null);
+                      return;
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Unable to create application on server.');
+                      return;
+                    }
+                  }
+                  setError(msg);
+                }
               }}
             >
               Update

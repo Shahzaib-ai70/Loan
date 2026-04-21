@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
-import { adminApi } from '../lib/api';
+import { adminApi, applicationsApi } from '../lib/api';
 import {
   type Application,
   type User,
@@ -89,13 +89,37 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
 
   const saveEdit = () => {
     if (!draftApp || !draftUser) return;
-    upsertUser(draftUser);
-    upsertApplication(draftApp);
-    setUserBalance(draftApp.userId, {
-      ...getUserBalance(draftApp.userId),
-      currentBalance: Number(balanceInput) || 0,
-    });
-    setRefreshKey((x) => x + 1);
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) {
+      setError('Admin session expired. Please logout and login again.');
+      return;
+    }
+    setError('');
+    const nextBalance = Number(balanceInput) || 0;
+    adminApi
+      .updateApplication(adminPin, draftApp.id, draftApp)
+      .catch(async (e) => {
+        const msg = e instanceof Error ? e.message : 'Unable to save changes.';
+        if (msg.toLowerCase().includes('application not found')) {
+          const created = await applicationsApi.create(draftApp);
+          upsertApplication(created.application as Application);
+          return { application: created.application };
+        }
+        throw e;
+      })
+      .then(async (res) => {
+        upsertUser(draftUser);
+        upsertApplication(res.application as Application);
+        await adminApi.setUserBalance(adminPin, draftApp.userId, nextBalance);
+        setUserBalance(draftApp.userId, {
+          ...getUserBalance(draftApp.userId),
+          currentBalance: nextBalance,
+        });
+        setRefreshKey((x) => x + 1);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to save changes.');
+      });
   };
 
   if (!adminLoggedIn) {
@@ -167,6 +191,12 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
             Save
           </Button>
         </div>
+
+        {error && (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {error}
+          </div>
+        )}
 
         <div className={`${card} mt-4`}>
           <div className="border-b border-slate-200 bg-white px-4 py-3">
