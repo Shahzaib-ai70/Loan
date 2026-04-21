@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 
 const dbFile = process.env.DB_FILE || './data/loan_app.db';
@@ -67,6 +68,25 @@ export const initDb = () => {
 
   const pin = process.env.DEFAULT_ADMIN_PIN || '123456';
   db.prepare('INSERT OR IGNORE INTO admin_settings (id, pin) VALUES (1, ?)').run(pin);
+
+  const cols = db.prepare('PRAGMA table_info(admin_settings)').all();
+  const colNames = new Set(cols.map((c) => c.name));
+  if (!colNames.has('username')) db.exec('ALTER TABLE admin_settings ADD COLUMN username TEXT');
+  if (!colNames.has('password_salt')) db.exec('ALTER TABLE admin_settings ADD COLUMN password_salt TEXT');
+  if (!colNames.has('password_hash')) db.exec('ALTER TABLE admin_settings ADD COLUMN password_hash TEXT');
+
+  const username = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
+  const password = process.env.DEFAULT_ADMIN_PASSWORD || pin;
+  const row = db.prepare('SELECT username, password_salt, password_hash FROM admin_settings WHERE id = 1').get();
+  if (!row?.username || !row?.password_salt || !row?.password_hash) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+    db.prepare('UPDATE admin_settings SET username = ?, password_salt = ?, password_hash = ? WHERE id = 1').run(
+      String(username).trim(),
+      salt,
+      hash,
+    );
+  }
 
   db.prepare(
     'INSERT OR IGNORE INTO support_settings (id, whatsapp_link, telegram_link, support_email, helpline) VALUES (1, ?, ?, ?, ?)',

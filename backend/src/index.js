@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'node:crypto';
 import { db, initDb, now } from './db.js';
 
 initDb();
@@ -17,6 +18,23 @@ const makeId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().
 const getAdminPin = () => {
   const row = db.prepare('SELECT pin FROM admin_settings WHERE id = 1').get();
   return row?.pin || '123456';
+};
+
+const getAdminCredentials = () => {
+  const row = db.prepare('SELECT username, password_salt, password_hash FROM admin_settings WHERE id = 1').get();
+  return {
+    username: row?.username || 'admin',
+    passwordSalt: row?.password_salt || '',
+    passwordHash: row?.password_hash || '',
+  };
+};
+
+const verifyAdminPassword = (username, password) => {
+  const creds = getAdminCredentials();
+  if (!creds.passwordSalt || !creds.passwordHash) return false;
+  if (String(username || '').trim().toLowerCase() !== String(creds.username || '').trim().toLowerCase()) return false;
+  const computed = crypto.scryptSync(String(password || ''), creds.passwordSalt, 64).toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(creds.passwordHash, 'hex'));
 };
 
 const requireAdmin = (req, res, next) => {
@@ -192,12 +210,21 @@ app.post('/api/withdraw', (req, res) => {
 });
 
 app.post('/api/admin/login', (req, res) => {
-  const { pin = '' } = req.body || {};
-  if (String(pin).trim() !== getAdminPin()) {
-    res.status(401).json({ message: 'Invalid admin pin.' });
+  const { pin = '', username = '', password = '' } = req.body || {};
+  if (String(pin).trim()) {
+    if (String(pin).trim() !== getAdminPin()) {
+      res.status(401).json({ message: 'Invalid admin pin.' });
+      return;
+    }
+    res.json({ ok: true, adminPin: String(pin).trim() });
     return;
   }
-  res.json({ ok: true });
+
+  if (!verifyAdminPassword(username, password)) {
+    res.status(401).json({ message: 'Invalid admin login.' });
+    return;
+  }
+  res.json({ ok: true, adminPin: getAdminPin() });
 });
 
 app.get('/api/admin/overview', requireAdmin, (_req, res) => {

@@ -2,17 +2,18 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
+import { adminApi } from '../lib/api';
 import {
   type Application,
   type User,
   getDb,
   getUserBalance,
   isAdminLoggedIn,
+  setAdminPin,
   setAdminSession,
   setUserBalance,
   upsertApplication,
   upsertUser,
-  verifyAdminPin,
 } from '../lib/db';
 
 type AdminEditUserProps = {
@@ -24,7 +25,8 @@ const card = 'rounded-sm border border-slate-200 bg-white';
 const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-[#0b4a90]';
 
 export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
-  const [pin, setPin] = useState('');
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [draftApp, setDraftApp] = useState<Application | null>(null);
@@ -71,16 +73,18 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
     load();
   }, [adminLoggedIn, appId, refreshKey]);
 
-  const login = (e: FormEvent<HTMLFormElement>) => {
+  const login = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-    if (!verifyAdminPin(pin)) {
-      setError('Invalid admin PIN.');
-      return;
+    try {
+      const res = await adminApi.login({ username, password });
+      setAdminPin(res.adminPin);
+      setAdminSession(true);
+      setPassword('');
+      setRefreshKey((x) => x + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Invalid admin login.');
     }
-    setAdminSession(true);
-    setPin('');
-    setRefreshKey((x) => x + 1);
   };
 
   const saveEdit = () => {
@@ -99,7 +103,7 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
       <div className="mx-auto w-full max-w-md px-4 py-10">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-extrabold text-slate-900">Admin Panel</h1>
-          <p className="mt-1 text-sm text-slate-600">Enter admin PIN to manage customers.</p>
+          <p className="mt-1 text-sm text-slate-600">Enter admin login to manage customers.</p>
           {error && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               {error}
@@ -107,9 +111,16 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
           )}
           <form className="mt-6 space-y-4" onSubmit={login}>
             <input
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="6-digit PIN"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
+              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              type="password"
               className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
             />
             <Button className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">

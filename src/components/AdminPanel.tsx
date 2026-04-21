@@ -3,6 +3,7 @@ import { Eye, KeyRound, Pencil, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
+import { adminApi } from '../lib/api';
 import {
   type Application,
   type LoanStatus,
@@ -11,12 +12,12 @@ import {
   getSession,
   getUserBalance,
   isAdminLoggedIn,
+  setAdminPin,
   setAdminSession,
   setSession,
   setUserBalance,
   upsertApplication,
   upsertUser,
-  verifyAdminPin,
 } from '../lib/db';
 
 type AdminPanelProps = {
@@ -32,7 +33,8 @@ const BLOCKED_NOTICE_KEY = 'take_easy_loan_blocked_notice';
 const TERM_OPTIONS: number[] = [3, 6, 12, 24, 36, 48, 60, 90, 120];
 
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
-  const [pin, setPin] = useState('');
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [section, setSection] = useState<Section>('dashboard');
@@ -102,16 +104,18 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     return placeholder;
   };
 
-  const login = (e: FormEvent<HTMLFormElement>) => {
+  const login = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-    if (!verifyAdminPin(pin)) {
-      setError('Invalid admin PIN.');
-      return;
+    try {
+      const res = await adminApi.login({ username, password });
+      setAdminPin(res.adminPin);
+      setAdminSession(true);
+      setPassword('');
+      setRefreshKey((x) => x + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Invalid admin login.');
     }
-    setAdminSession(true);
-    setPin('');
-    setRefreshKey((x) => x + 1);
   };
 
   const logout = () => {
@@ -259,7 +263,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       <div className="mx-auto w-full max-w-md px-4 py-10">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-extrabold text-slate-900">Admin Panel</h1>
-          <p className="mt-1 text-sm text-slate-600">Enter admin PIN to manage customers.</p>
+          <p className="mt-1 text-sm text-slate-600">Enter admin login to manage customers.</p>
           {error && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               {error}
@@ -267,9 +271,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           )}
           <form className="mt-6 space-y-4" onSubmit={login}>
             <input
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="6-digit PIN"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
+              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              type="password"
               className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
             />
             <Button className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">

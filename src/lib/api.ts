@@ -34,6 +34,11 @@ export type SupportSettings = {
   helpline: string;
 };
 
+export type AdminLoginResponse = {
+  ok: boolean;
+  adminPin: string;
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -76,6 +81,11 @@ export const chatApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ message }),
     }),
+};
+
+export const adminApi = {
+  login: (params: { pin?: string; username?: string; password?: string }) =>
+    request<AdminLoginResponse>(`/api/admin/login`, { method: 'POST', body: JSON.stringify(params) }),
 };
 
 export const supportApi = {
