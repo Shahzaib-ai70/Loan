@@ -186,6 +186,7 @@ function App() {
   );
 
   useEffect(() => {
+    if (blockedPath) return;
     localStorage.setItem(VIEW_KEY, currentView);
     const url = new URL(window.location.href);
     if (currentView === 'admin') {
@@ -201,7 +202,7 @@ function App() {
     if (currentView === 'admin-edit' && adminEditAppId) url.searchParams.set('appId', adminEditAppId);
     else url.searchParams.delete('appId');
     window.history.replaceState({}, '', url.toString());
-  }, [adminEditAppId, currentView]);
+  }, [adminEditAppId, blockedPath, currentView]);
 
   useEffect(() => {
     if (currentView !== 'loan-application' && currentView !== 'application-status' && currentView !== 'withdraw') return;
