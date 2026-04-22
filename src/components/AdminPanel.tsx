@@ -490,7 +490,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
-                variant={loginMode === 'password' ? 'default' : 'outline'}
+                variant={loginMode === 'password' ? 'primary' : 'outline'}
                 className={loginMode === 'password' ? 'h-10 w-full bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]' : 'h-10 w-full text-sm font-extrabold'}
                 onClick={() => setLoginMode('password')}
               >
@@ -498,7 +498,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               </Button>
               <Button
                 type="button"
-                variant={loginMode === 'pin' ? 'default' : 'outline'}
+                variant={loginMode === 'pin' ? 'primary' : 'outline'}
                 className={loginMode === 'pin' ? 'h-10 w-full bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]' : 'h-10 w-full text-sm font-extrabold'}
                 onClick={() => setLoginMode('pin')}
               >

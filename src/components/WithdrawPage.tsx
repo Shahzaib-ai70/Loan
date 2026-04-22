@@ -100,7 +100,6 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
       })
       .catch((e) => {
         const msg = e instanceof Error ? e.message : 'Withdraw failed.';
-        setError(msg);
         setNoticeTitle('Notification');
         setNoticeMessage(msg);
         setNoticeOpen(true);
