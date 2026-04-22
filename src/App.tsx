@@ -54,6 +54,18 @@ export type View =
   | 'live-chat';
 
 const VIEW_KEY = 'take_easy_loan_current_view';
+const PUBLIC_PATH_PREFIXES = ['/online-ca', '/online.ca', '/onlineca'] as const;
+const DEFAULT_PUBLIC_PATH_PREFIX = '/online-ca';
+const ADMIN_PATH = '/drugload-admin';
+const AGENT_PATH = '/drugload-agent';
+
+const parsePath = (pathname: string) => {
+  const p = pathname || '/';
+  const match = PUBLIC_PATH_PREFIXES.find((prefix) => p === prefix || p.startsWith(`${prefix}/`));
+  if (!match) return { base: '', rest: p };
+  const restRaw = p.slice(match.length) || '/';
+  return { base: match, rest: restRaw.startsWith('/') ? restRaw : `/${restRaw}` };
+};
 
 const isView = (value: string): value is View =>
   [
@@ -91,11 +103,19 @@ function App() {
   });
 
   const [alreadyAppliedOpen, setAlreadyAppliedOpen] = useState(false);
+  const [publicBasePath] = useState(() => {
+    try {
+      const { base } = parsePath(window.location.pathname || '/');
+      return base || DEFAULT_PUBLIC_PATH_PREFIX;
+    } catch {
+      return DEFAULT_PUBLIC_PATH_PREFIX;
+    }
+  });
   const [currentView, setCurrentView] = useState<View>(() => {
     try {
-      const path = window.location.pathname || '/';
-      if (path === '/admin' || path === '/drugloan-admin') return 'admin';
-      if (path === '/agent' || path === '/drugloan-agent') return 'agent';
+      const { rest } = parsePath(window.location.pathname || '/');
+      if (rest === '/admin' || rest === ADMIN_PATH || rest === '/drugloan-admin') return 'admin';
+      if (rest === '/agent' || rest === AGENT_PATH || rest === '/drugloan-agent') return 'agent';
       const urlView = new URLSearchParams(window.location.search).get('view');
       if (urlView && isView(urlView)) return urlView;
       const raw = localStorage.getItem(VIEW_KEY);
@@ -156,13 +176,13 @@ function App() {
     localStorage.setItem(VIEW_KEY, currentView);
     const url = new URL(window.location.href);
     if (currentView === 'admin') {
-      url.pathname = '/drugloan-admin';
+      url.pathname = ADMIN_PATH;
       url.searchParams.delete('view');
     } else if (currentView === 'agent') {
-      url.pathname = '/drugloan-agent';
+      url.pathname = AGENT_PATH;
       url.searchParams.delete('view');
     } else {
-      url.pathname = '/';
+      url.pathname = publicBasePath;
       url.searchParams.set('view', currentView);
     }
     if (currentView === 'admin-edit' && adminEditAppId) url.searchParams.set('appId', adminEditAppId);
