@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from './ui/Button';
 import { agentApi } from '../lib/api';
 import { type Application, type User } from '../lib/db';
@@ -32,6 +32,19 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [apps, setApps] = useState<Application[]>([]);
   const [balances, setBalances] = useState<Record<string, { currentBalance: number; withdrawnAmount: number }>>({});
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editDraftUser, setEditDraftUser] = useState<User | null>(null);
+  const [editDraftApp, setEditDraftApp] = useState<Application | null>(null);
+  const [editBalanceInput, setEditBalanceInput] = useState('0');
+  const [docPreview, setDocPreview] = useState<{ title: string; src: string } | null>(null);
+  const [statusModalAppId, setStatusModalAppId] = useState<string | null>(null);
+  const [statusValue, setStatusValue] = useState<Application['status']>('under_review');
+  const [statusLabel, setStatusLabel] = useState('');
+  const [statusNote, setStatusNote] = useState('');
+  const [codeModalAppId, setCodeModalAppId] = useState<string | null>(null);
+  const [withdrawCode, setWithdrawCode] = useState('');
+  const [adjustUserId, setAdjustUserId] = useState<string | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState('');
 
   const latestAppsPerUser = useMemo(() => {
     const sorted = apps.slice().sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
@@ -91,6 +104,151 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
       setBalances(res.balances || {});
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load agent data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openEdit = (userId: string) => {
+    const user = users.find((u) => u.id === userId) || null;
+    const app = latestAppByUserId[userId] || null;
+    if (!user || !app) {
+      setError('User or application not found.');
+      return;
+    }
+    setEditUserId(userId);
+    setEditDraftUser({ ...user });
+    setEditDraftApp({ ...app });
+    setEditBalanceInput(String((balances[userId] || { currentBalance: 0 }).currentBalance || 0));
+  };
+
+  const saveEdit = async () => {
+    if (!agentKey || !editUserId || !editDraftUser || !editDraftApp) return;
+    setLoading(true);
+    setError('');
+    try {
+      const userRes = await agentApi.updateUser(agentKey, editUserId, {
+        gender: editDraftUser.gender,
+        phoneOrEmail: editDraftUser.phoneOrEmail,
+        password: editDraftUser.password,
+        inviteCode: editDraftUser.inviteCode,
+      });
+      const appRes = await agentApi.updateApplication(agentKey, editDraftApp.id, editDraftApp);
+      const nextBalance = Number(editBalanceInput) || 0;
+      await agentApi.setUserBalance(agentKey, editUserId, nextBalance);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === editUserId
+            ? {
+                ...u,
+                gender: userRes.user.gender as User['gender'],
+                phoneOrEmail: userRes.user.phoneOrEmail,
+                password: editDraftUser.password,
+                inviteCode: userRes.user.inviteCode || editDraftUser.inviteCode,
+              }
+            : u,
+        ),
+      );
+      setApps((prev) => prev.map((a) => (a.id === editDraftApp.id ? (appRes.application as Application) : a)));
+      setBalances((prev) => ({
+        ...prev,
+        [editUserId]: {
+          currentBalance: nextBalance,
+          withdrawnAmount: prev[editUserId]?.withdrawnAmount || 0,
+        },
+      }));
+      setEditUserId(null);
+      setEditDraftUser(null);
+      setEditDraftApp(null);
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save changes.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveStatus = async () => {
+    if (!agentKey || !statusModalAppId) return;
+    const app = apps.find((x) => x.id === statusModalAppId);
+    if (!app) return;
+    setLoading(true);
+    setError('');
+    try {
+      const patch = {
+        status: statusValue,
+        statusLabel: statusLabel.trim() || undefined,
+        statusNote: statusNote.trim() || undefined,
+        approvedAt: statusValue === 'approved' ? Date.now() : undefined,
+      };
+      const res = await agentApi.updateApplication(agentKey, statusModalAppId, patch);
+      if (statusValue === 'approved') {
+        await agentApi.setUserBalance(agentKey, app.userId, Number((res.application as Application).loan?.amount || 0));
+      }
+      setStatusModalAppId(null);
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update status.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveWithdrawCode = async () => {
+    if (!agentKey || !codeModalAppId) return;
+    if (withdrawCode.trim() && withdrawCode.trim().length !== 6) {
+      setError('Withdrawal code must be 6 digits.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await agentApi.updateApplication(agentKey, codeModalAppId, { withdrawCode: withdrawCode.trim() || undefined });
+      setCodeModalAppId(null);
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update withdrawal code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyAdjust = async () => {
+    if (!agentKey || !adjustUserId) return;
+    const delta = Number(String(adjustAmount).replace(/[$,\s]/g, ''));
+    if (!Number.isFinite(delta) || !delta) return;
+    const bal = balances[adjustUserId] || { currentBalance: 0, withdrawnAmount: 0 };
+    const next = Math.max(0, bal.currentBalance + delta);
+    setLoading(true);
+    setError('');
+    try {
+      await agentApi.setUserBalance(agentKey, adjustUserId, next);
+      setAdjustUserId(null);
+      setAdjustAmount('');
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update balance.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!agentKey) return;
+    const yes = window.confirm('Delete this user and all related details?');
+    if (!yes) return;
+    setLoading(true);
+    setError('');
+    try {
+      await agentApi.deleteUser(agentKey, userId);
+      if (editUserId === userId) {
+        setEditUserId(null);
+        setEditDraftUser(null);
+        setEditDraftApp(null);
+      }
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete user.');
     } finally {
       setLoading(false);
     }
@@ -258,12 +416,58 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                             <td className="px-3 py-2">{bal.currentBalance.toLocaleString()}</td>
                             <td className="px-3 py-2">{bal.withdrawnAmount.toLocaleString()}</td>
                             <td className="px-3 py-2">{app ? statusText : '-'}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap gap-2">
+                                {app && (
+                                  <>
+                                    <Button type="button" className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700" onClick={() => openEdit(u.id)}>
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
+                                      onClick={() => {
+                                        setStatusModalAppId(app.id);
+                                        setStatusValue(app.status);
+                                        setStatusLabel(app.statusLabel || '');
+                                        setStatusNote(app.statusNote || '');
+                                      }}
+                                    >
+                                      Status
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      className="h-8 rounded bg-slate-600 px-2 text-xs font-bold text-white hover:bg-slate-700"
+                                      onClick={() => {
+                                        setCodeModalAppId(app.id);
+                                        setWithdrawCode(app.withdrawCode || '');
+                                      }}
+                                    >
+                                      Code
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      className="h-8 rounded bg-amber-500 px-2 text-xs font-bold text-white hover:bg-amber-600"
+                                      onClick={() => {
+                                        setAdjustUserId(u.id);
+                                        setAdjustAmount('');
+                                      }}
+                                    >
+                                      Balance
+                                    </Button>
+                                  </>
+                                )}
+                                <Button type="button" className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700" onClick={() => deleteUser(u.id)}>
+                                  Delete
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
                       {!filteredUsers.length && (
                         <tr>
-                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={7}>
+                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={8}>
                             No customers found.
                           </td>
                         </tr>
@@ -317,6 +521,105 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
           </div>
         </main>
       </div>
+
+      <Modal open={!!editUserId && !!editDraftUser && !!editDraftApp} title="Edit User" onClose={() => setEditUserId(null)} maxWidthClassName="max-w-5xl">
+        {editDraftUser && editDraftApp && (
+          <div className="space-y-4">
+            <Grid2>
+              <EditInput label="Username (Phone/Email)" value={editDraftUser.phoneOrEmail} onChange={(v) => setEditDraftUser({ ...editDraftUser, phoneOrEmail: v })} />
+              <EditInput label="Gender" value={editDraftUser.gender} onChange={(v) => setEditDraftUser({ ...editDraftUser, gender: v as User['gender'] })} />
+              <EditInput label="Password" value={editDraftUser.password} onChange={(v) => setEditDraftUser({ ...editDraftUser, password: v })} />
+              <EditInput label="Invite Code" value={editDraftUser.inviteCode} onChange={(v) => setEditDraftUser({ ...editDraftUser, inviteCode: v })} />
+              <EditInput label="Applicant" value={editDraftApp.applicant.fullName} onChange={(v) => setEditDraftApp({ ...editDraftApp, applicant: { ...editDraftApp.applicant, fullName: v } })} />
+              <EditInput label="ID Card Number" value={editDraftApp.applicant.idCardNumber} onChange={(v) => setEditDraftApp({ ...editDraftApp, applicant: { ...editDraftApp.applicant, idCardNumber: v } })} />
+              <EditInput label="Date of Issue" value={editDraftApp.applicant.dateOfIssue} onChange={(v) => setEditDraftApp({ ...editDraftApp, applicant: { ...editDraftApp.applicant, dateOfIssue: v } })} />
+              <EditInput label="Place of Issue" value={editDraftApp.applicant.placeOfIssue} onChange={(v) => setEditDraftApp({ ...editDraftApp, applicant: { ...editDraftApp.applicant, placeOfIssue: v } })} />
+              <EditInput label="Current Address" value={editDraftApp.contact.currentAddress} onChange={(v) => setEditDraftApp({ ...editDraftApp, contact: { ...editDraftApp.contact, currentAddress: v } })} />
+              <EditInput label="Current Job" value={editDraftApp.contact.currentJob} onChange={(v) => setEditDraftApp({ ...editDraftApp, contact: { ...editDraftApp.contact, currentJob: v } })} />
+              <EditInput label="Work Address" value={editDraftApp.contact.workAddress} onChange={(v) => setEditDraftApp({ ...editDraftApp, contact: { ...editDraftApp.contact, workAddress: v } })} />
+              <EditInput label="Position" value={editDraftApp.contact.position} onChange={(v) => setEditDraftApp({ ...editDraftApp, contact: { ...editDraftApp.contact, position: v } })} />
+              <EditInput label="Monthly Income" value={editDraftApp.contact.monthlyIncome} onChange={(v) => setEditDraftApp({ ...editDraftApp, contact: { ...editDraftApp.contact, monthlyIncome: v } })} />
+              <EditInput label="Loan Amount" value={String(editDraftApp.loan.amount)} onChange={(v) => setEditDraftApp({ ...editDraftApp, loan: { ...editDraftApp.loan, amount: Number(v) || 0 } })} />
+              <EditInput label="Interest Rate (%)" value={String(editDraftApp.loan.interestRate)} onChange={(v) => setEditDraftApp({ ...editDraftApp, loan: { ...editDraftApp.loan, interestRate: Number(v) || 0 } })} />
+              <EditInput label="Loan Term (months)" value={String(editDraftApp.loan.termMonths)} onChange={(v) => setEditDraftApp({ ...editDraftApp, loan: { ...editDraftApp.loan, termMonths: Number(v) || 0 } })} />
+              <EditInput label="Current Balance" value={editBalanceInput} onChange={setEditBalanceInput} />
+              <EditInput label="Withdraw Code" value={editDraftApp.withdrawCode || ''} onChange={(v) => setEditDraftApp({ ...editDraftApp, withdrawCode: v })} />
+              <EditInput label="Bank Name" value={editDraftApp.bank.bankName} onChange={(v) => setEditDraftApp({ ...editDraftApp, bank: { ...editDraftApp.bank, bankName: v } })} />
+              <EditInput label="Account Holder" value={editDraftApp.bank.accountHolderName} onChange={(v) => setEditDraftApp({ ...editDraftApp, bank: { ...editDraftApp.bank, accountHolderName: v } })} />
+              <EditInput label="Account Number" value={editDraftApp.bank.accountNumber} onChange={(v) => setEditDraftApp({ ...editDraftApp, bank: { ...editDraftApp.bank, accountNumber: v } })} />
+            </Grid2>
+
+            <Box title="KYC Pictures">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <DocImage title="Front Side" src={editDraftApp.documents.idFrontDataUrl} fallback={editDraftApp.documents.idFrontName} onOpen={(title, src) => setDocPreview({ title, src })} />
+                <DocImage title="Back Side" src={editDraftApp.documents.idBackDataUrl} fallback={editDraftApp.documents.idBackName} onOpen={(title, src) => setDocPreview({ title, src })} />
+                <DocImage title="Selfie" src={editDraftApp.documents.selfieHoldingIdDataUrl} fallback={editDraftApp.documents.selfieHoldingIdName} onOpen={(title, src) => setDocPreview({ title, src })} />
+              </div>
+            </Box>
+
+            <div className="flex gap-2">
+              <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={saveEdit} disabled={loading}>
+                Save
+              </Button>
+              <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setEditUserId(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!statusModalAppId} title="Change Status" onClose={() => setStatusModalAppId(null)}>
+        <div className="space-y-4">
+          <select value={statusValue} onChange={(e) => setStatusValue(e.target.value as Application['status'])} className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]">
+            <option value="under_review">Under Review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <input value={statusLabel} onChange={(e) => setStatusLabel(e.target.value)} placeholder="Status label" className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]" />
+          <textarea value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="Status note" className="min-h-[100px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]" />
+          <div className="flex gap-2">
+            <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={saveStatus} disabled={loading}>
+              Save
+            </Button>
+            <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setStatusModalAppId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!codeModalAppId} title="Change Withdrawal Code" onClose={() => setCodeModalAppId(null)}>
+        <div className="space-y-4">
+          <input value={withdrawCode} onChange={(e) => setWithdrawCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Enter 6-digit code" className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]" />
+          <div className="flex gap-2">
+            <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={saveWithdrawCode} disabled={loading}>
+              Save
+            </Button>
+            <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setCodeModalAppId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!adjustUserId} title="Add / Subtract Balance" onClose={() => setAdjustUserId(null)}>
+        <div className="space-y-4">
+          <input value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} placeholder="Enter amount (use minus to subtract)" className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]" />
+          <div className="flex gap-2">
+            <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={applyAdjust} disabled={loading}>
+              Apply
+            </Button>
+            <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setAdjustUserId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!docPreview} title={docPreview?.title} onClose={() => setDocPreview(null)} maxWidthClassName="max-w-3xl">
+        {docPreview && <img src={docPreview.src} alt={docPreview.title} className="max-h-[70vh] w-full rounded-xl border bg-white object-contain" />}
+      </Modal>
     </div>
   );
 }
@@ -343,5 +646,52 @@ function SidebarItem({
       <span>{label}</span>
       <span className={`rounded px-2 py-0.5 text-xs ${active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{count}</span>
     </button>
+  );
+}
+
+function Box({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mt-3 overflow-hidden rounded border border-slate-300">
+      <div className="bg-slate-600 px-3 py-1 text-xs font-extrabold text-white">{title}</div>
+      <div className="p-2">{children}</div>
+    </div>
+  );
+}
+
+function Grid2({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">{children}</div>;
+}
+
+function EditInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <div className="mb-1 text-[11px] font-bold text-slate-700">{label}</div>
+      <input value={value} onChange={(e) => onChange(e.target.value)} className={field} />
+    </div>
+  );
+}
+
+function DocImage({
+  title,
+  src,
+  fallback,
+  onOpen,
+}: {
+  title: string;
+  src?: string;
+  fallback?: string;
+  onOpen: (title: string, src: string) => void;
+}) {
+  return (
+    <div className="rounded border border-slate-300 bg-white p-2">
+      <div className="mb-1 text-[11px] font-bold text-slate-700">{title}</div>
+      {src ? (
+        <button type="button" className="block w-full" onClick={() => onOpen(title, src)}>
+          <img src={src} alt={title} className="h-24 w-full rounded border object-cover" />
+        </button>
+      ) : (
+        <div className="text-xs text-slate-600">{fallback || '-'}</div>
+      )}
+    </div>
   );
 }

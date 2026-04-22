@@ -185,6 +185,29 @@ export const agentApi = {
     request<AgentLoginResponse>(`/api/agent/login`, { method: 'POST', body: JSON.stringify(params) }),
   getOverview: (agentKey: string) =>
     request<AgentOverviewResponse>(`/api/agent/overview`, { headers: { 'x-agent-key': agentKey } }),
+  updateApplication: (agentKey: string, appId: string, patch: unknown) =>
+    request<{ application: unknown }>(`/api/agent/applications/${encodeURIComponent(appId)}`, {
+      method: 'PUT',
+      headers: { 'x-agent-key': agentKey },
+      body: JSON.stringify(patch),
+    }),
+  setUserBalance: (agentKey: string, userId: string, currentBalance: number) =>
+    request<{ ok: boolean }>(`/api/agent/users/${encodeURIComponent(userId)}/balance`, {
+      method: 'PUT',
+      headers: { 'x-agent-key': agentKey },
+      body: JSON.stringify({ currentBalance }),
+    }),
+  updateUser: (agentKey: string, userId: string, patch: { gender?: string; phoneOrEmail?: string; password?: string; inviteCode?: string }) =>
+    request<{ user: ApiUser & { inviteCode?: string } }>(`/api/agent/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { 'x-agent-key': agentKey },
+      body: JSON.stringify(patch),
+    }),
+  deleteUser: (agentKey: string, userId: string) =>
+    request<{ ok: boolean }>(`/api/agent/users/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: { 'x-agent-key': agentKey },
+    }),
 };
 
 export const authApi = {

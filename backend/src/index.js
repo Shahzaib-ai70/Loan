@@ -393,6 +393,110 @@ app.get('/api/agent/overview', requireAgent, (req, res) => {
   });
 });
 
+app.put('/api/agent/applications/:appId', requireAgent, (req, res) => {
+  const agent = req.agent;
+  const { appId } = req.params;
+  const row = db
+    .prepare(
+      `SELECT a.payload_json FROM applications a
+       JOIN users u ON u.id = a.user_id
+       WHERE a.id = ? AND u.agent_id = ?`,
+    )
+    .get(appId, agent.id);
+  if (!row) {
+    res.status(404).json({ message: 'Application not found.' });
+    return;
+  }
+  const oldPayload = JSON.parse(row.payload_json);
+  const updated = { ...oldPayload, ...req.body, id: appId };
+  db.prepare('UPDATE applications SET status = ?, approved_at = ?, withdraw_code = ?, payload_json = ? WHERE id = ?').run(
+    updated.status || oldPayload.status,
+    updated.approvedAt || oldPayload.approvedAt || null,
+    updated.withdrawCode || oldPayload.withdrawCode || null,
+    JSON.stringify(updated),
+    appId,
+  );
+  res.json({ application: updated });
+});
+
+app.put('/api/agent/users/:userId/balance', requireAgent, (req, res) => {
+  const agent = req.agent;
+  const { userId } = req.params;
+  const user = db.prepare('SELECT id FROM users WHERE id = ? AND agent_id = ?').get(userId, agent.id);
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  const amount = Number(req.body?.currentBalance || 0);
+  const old = db.prepare('SELECT withdrawn_amount FROM balances WHERE user_id = ?').get(userId);
+  db.prepare(
+    `INSERT INTO balances (user_id, current_balance, withdrawn_amount)
+     VALUES (?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET current_balance = excluded.current_balance`,
+  ).run(userId, Math.max(0, amount), old?.withdrawn_amount || 0);
+  res.json({ ok: true });
+});
+
+app.patch('/api/agent/users/:userId', requireAgent, (req, res) => {
+  const agent = req.agent;
+  const { userId } = req.params;
+  const user = db
+    .prepare('SELECT id, gender, phone_or_email, password, invite_code, created_at, last_application_id, agent_id FROM users WHERE id = ? AND agent_id = ?')
+    .get(userId, agent.id);
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  const nextGender = String(req.body?.gender || user.gender);
+  const nextPhone = String(req.body?.phoneOrEmail || user.phone_or_email).trim();
+  const nextPassword = req.body?.password == null ? String(user.password) : String(req.body.password);
+  const nextInviteCode = req.body?.inviteCode == null ? String(user.invite_code || '') : String(req.body.inviteCode || '');
+  if (!nextPhone) {
+    res.status(400).json({ message: 'Phone/Email is required.' });
+    return;
+  }
+  const existsLogin = db
+    .prepare('SELECT id FROM users WHERE lower(phone_or_email) = ? AND id != ?')
+    .get(normalize(nextPhone), userId);
+  if (existsLogin) {
+    res.status(409).json({ message: 'Phone/Email already exists.' });
+    return;
+  }
+  db.prepare('UPDATE users SET gender = ?, phone_or_email = ?, password = ?, invite_code = ? WHERE id = ?').run(
+    nextGender,
+    nextPhone,
+    nextPassword,
+    nextInviteCode,
+    userId,
+  );
+  res.json({
+    user: {
+      id: userId,
+      gender: nextGender,
+      phoneOrEmail: nextPhone,
+      createdAt: user.created_at,
+      lastApplicationId: user.last_application_id || undefined,
+      agentId: user.agent_id || undefined,
+      inviteCode: nextInviteCode || undefined,
+    },
+  });
+});
+
+app.delete('/api/agent/users/:userId', requireAgent, (req, res) => {
+  const agent = req.agent;
+  const { userId } = req.params;
+  const user = db.prepare('SELECT id FROM users WHERE id = ? AND agent_id = ?').get(userId, agent.id);
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  db.prepare('DELETE FROM applications WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM balances WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM chat_messages WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  res.json({ ok: true });
+});
+
 app.put('/api/admin/applications/:appId', requireAdmin, (req, res) => {
   const { appId } = req.params;
   const row = db.prepare('SELECT payload_json FROM applications WHERE id = ?').get(appId);
