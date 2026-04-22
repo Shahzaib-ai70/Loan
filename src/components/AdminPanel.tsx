@@ -56,6 +56,8 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [perPage, setPerPage] = useState(50);
   const [pinModalAppId, setPinModalAppId] = useState<string | null>(null);
   const [pinCode, setPinCode] = useState('');
+  const [withdrawErrorModalAppId, setWithdrawErrorModalAppId] = useState<string | null>(null);
+  const [withdrawErrorText, setWithdrawErrorText] = useState('');
   const [passwordModalUserId, setPasswordModalUserId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [editLoanAppId, setEditLoanAppId] = useState<string | null>(null);
@@ -647,6 +649,18 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                 <Button type="button" className="h-8 rounded bg-teal-600 px-2 text-xs font-bold text-white hover:bg-teal-700" onClick={() => toggleDisableLogin(u.id)}>
                                   <Users className="mr-1 h-3 w-3" /> {u?.disabledLogin ? 'Enable Login' : 'Disable Login'}
                                 </Button>
+                                {app && (
+                                  <Button
+                                    type="button"
+                                    className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
+                                    onClick={() => {
+                                      setWithdrawErrorModalAppId(app.id);
+                                      setWithdrawErrorText(String(app.withdrawError || ''));
+                                    }}
+                                  >
+                                    <Pencil className="mr-1 h-3 w-3" /> Withdraw Error
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -905,6 +919,59 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               Update
             </Button>
             <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setPinModalAppId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!withdrawErrorModalAppId}
+        title="Withdraw Error Message"
+        onClose={() => setWithdrawErrorModalAppId(null)}
+        maxWidthClassName="max-w-xl"
+      >
+        <div className="space-y-4">
+          <div className="text-sm font-semibold text-slate-700">Write a message to show on the user Withdraw page.</div>
+          <textarea
+            value={withdrawErrorText}
+            onChange={(e) => setWithdrawErrorText(e.target.value)}
+            placeholder="Example: Your account is under verification. Please contact customer service."
+            className="min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
+          />
+          <div className="flex gap-2">
+            <Button
+              className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
+              onClick={async () => {
+                if (!withdrawErrorModalAppId) return;
+                const adminPin = getDb().admin.pin.trim();
+                if (!adminPin) {
+                  setError('Admin session expired. Please logout and login again.');
+                  return;
+                }
+                setError('');
+                try {
+                  const msg = withdrawErrorText.trim();
+                  const res = await adminApi.updateApplication(adminPin, withdrawErrorModalAppId, { withdrawError: msg || undefined });
+                  upsertApplication(res.application as Application);
+                  await syncFromServer(adminPin);
+                  setRefreshKey((x) => x + 1);
+                  setWithdrawErrorModalAppId(null);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Unable to update withdraw error.');
+                }
+              }}
+            >
+              Update
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 rounded px-4 text-sm font-bold"
+              onClick={() => setWithdrawErrorText('')}
+            >
+              Clear
+            </Button>
+            <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setWithdrawErrorModalAppId(null)}>
               Cancel
             </Button>
           </div>
