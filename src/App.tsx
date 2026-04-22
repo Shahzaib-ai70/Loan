@@ -63,6 +63,7 @@ const VIEW_KEY = 'take_easy_loan_current_view';
 const DEFAULT_PUBLIC_PATH_PREFIX = '/online-ca';
 const ADMIN_PATH = '/drugload-admin';
 const AGENT_PATH = '/drugload-agent';
+const TERMS_ACCEPTED_KEY_PREFIX = 'take_easy_loan_terms_accepted_user_';
 
 const normalizePath = (pathname: string) => {
   const p = String(pathname || '/').trim();
@@ -175,6 +176,19 @@ function App() {
         return;
       }
 
+      if (view === 'loan-application' && session?.isLoggedIn) {
+        try {
+          const accepted = localStorage.getItem(`${TERMS_ACCEPTED_KEY_PREFIX}${session.userId}`) === '1';
+          if (!accepted) {
+            setCurrentView('register');
+            return;
+          }
+        } catch {
+          setCurrentView('register');
+          return;
+        }
+      }
+
       if (view === 'loan-application' && app) {
         setAlreadyAppliedOpen(true);
         setCurrentView('application-status');
@@ -189,6 +203,18 @@ function App() {
     },
     [],
   );
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.isLoggedIn) return;
+    if (currentView !== 'loan-application') return;
+    try {
+      const accepted = localStorage.getItem(`${TERMS_ACCEPTED_KEY_PREFIX}${session.userId}`) === '1';
+      if (!accepted) setCurrentView('register');
+    } catch {
+      setCurrentView('register');
+    }
+  }, [currentView]);
 
   useEffect(() => {
     if (blockedPath) return;

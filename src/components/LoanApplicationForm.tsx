@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { CheckCircle2, ChevronRight, LockKeyhole, Smartphone } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { authApi } from '../lib/api';
-import { setSession, upsertUser, type Gender } from '../lib/db';
+import { getSession, setSession, upsertUser, type Gender } from '../lib/db';
 
 type RegisterFormData = {
   gender: Gender;
@@ -25,6 +25,9 @@ const SUPPORT_LINKS = [
   'Fee Schedule',
 ];
 
+const TERMS_ACCEPTED_KEY_PREFIX = 'take_easy_loan_terms_accepted_user_';
+const TERMS_PENDING_KEY_PREFIX = 'take_easy_loan_terms_pending_user_';
+
 export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFormProps) {
   const [formData, setFormData] = useState<RegisterFormData>({
     gender: 'Male',
@@ -39,6 +42,20 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
   const [subscribeMessage, setSubscribeMessage] = useState('');
   const [termsOpen, setTermsOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.isLoggedIn) return;
+    try {
+      const accepted = localStorage.getItem(`${TERMS_ACCEPTED_KEY_PREFIX}${session.userId}`) === '1';
+      const pending = localStorage.getItem(`${TERMS_PENDING_KEY_PREFIX}${session.userId}`) === '1';
+      if (pending && !accepted) {
+        setTermsAccepted(false);
+        setTermsOpen(true);
+      }
+    } catch {
+    }
+  }, []);
 
   const updateField = <K extends keyof RegisterFormData>(key: K, value: RegisterFormData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -86,6 +103,11 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
         disabledLogin: false,
       });
       setSession(res.session);
+      try {
+        localStorage.setItem(`${TERMS_PENDING_KEY_PREFIX}${res.session.userId}`, '1');
+        localStorage.removeItem(`${TERMS_ACCEPTED_KEY_PREFIX}${res.session.userId}`);
+      } catch {
+      }
       setTermsAccepted(false);
       setTermsOpen(true);
     } catch (e) {
@@ -137,6 +159,14 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
               disabled={!termsAccepted}
               onClick={() => {
                 if (!termsAccepted) return;
+                try {
+                  const session = getSession();
+                  if (session?.isLoggedIn) {
+                    localStorage.setItem(`${TERMS_ACCEPTED_KEY_PREFIX}${session.userId}`, '1');
+                    localStorage.removeItem(`${TERMS_PENDING_KEY_PREFIX}${session.userId}`);
+                  }
+                } catch {
+                }
                 setTermsOpen(false);
                 onRegistered();
               }}
