@@ -97,7 +97,7 @@ export function TermsAndConditionsPage({ onBack }: TermsAndConditionsPageProps) 
               type="button"
               disabled={!agreeNow}
               onClick={() => {
-                if (!agreeNow) return;
+                if (!agreeNow || !storageKeys) return;
                 try {
                   localStorage.setItem(storageKeys.acceptedKey, '1');
                   localStorage.removeItem(storageKeys.pendingKey);
@@ -115,4 +115,3 @@ export function TermsAndConditionsPage({ onBack }: TermsAndConditionsPageProps) 
     </div>
   );
 }
-
