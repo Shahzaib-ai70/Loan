@@ -93,8 +93,8 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                   <div className="absolute inset-0 bg-gradient-to-r from-[#0b4a90]/90 via-[#0b4a90]/45 to-transparent" />
                   <div className="absolute inset-0">
                     <div className="mx-auto flex h-full max-w-[1100px] flex-col justify-end px-4 pb-6 sm:pb-10">
-                      <div className="flex items-end justify-between gap-4">
-                        <div className="max-w-[18rem] sm:max-w-xl">
+                      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="w-full max-w-full sm:max-w-xl">
                           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-white ring-1 ring-white/15">
                             <CircleCheck className="h-4 w-4 text-white/90" />
                             {s.badge}
@@ -105,16 +105,16 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                           <p className="mt-2 text-sm font-semibold text-white/85 sm:text-base">
                             {s.subtitle}
                           </p>
-                          <div className="mt-4 flex flex-wrap gap-3">
+                          <div className="mt-4 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
                             <Button
-                              className="h-11 rounded-full bg-white px-6 font-extrabold text-[#0b4a90] hover:bg-white/90"
+                              className="h-11 w-full rounded-full bg-white px-6 font-extrabold text-[#0b4a90] hover:bg-white/90 sm:w-auto"
                               onClick={() => onNavigate('loan-application')}
                             >
                               Apply Loan
                             </Button>
                             <Button
                               variant="ghost"
-                              className="h-11 rounded-full px-6 font-extrabold text-white hover:bg-white/10"
+                              className="h-11 w-full rounded-full px-6 font-extrabold text-white hover:bg-white/10 sm:w-auto"
                               onClick={() => onNavigate('auth')}
                             >
                               Sign In
