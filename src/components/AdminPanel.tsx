@@ -39,6 +39,8 @@ const isSection = (value: string): value is Section =>
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
+  const [loginMode, setLoginMode] = useState<'password' | 'pin'>('password');
+  const [pinLogin, setPinLogin] = useState('');
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -232,10 +234,14 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     e.preventDefault();
     setError('');
     try {
-      const res = await adminApi.login({ username, password });
+      const res =
+        loginMode === 'pin'
+          ? await adminApi.login({ pin: pinLogin.trim() })
+          : await adminApi.login({ username, password });
       setAdminPin(res.adminPin);
       setAdminSession(true);
       setPassword('');
+      setPinLogin('');
       await syncFromServer(res.adminPin);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid admin login.');
@@ -481,19 +487,49 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             </div>
           )}
           <form className="mt-6 space-y-4" onSubmit={login}>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              type="password"
-              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={loginMode === 'password' ? 'default' : 'outline'}
+                className={loginMode === 'password' ? 'h-10 w-full bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]' : 'h-10 w-full text-sm font-extrabold'}
+                onClick={() => setLoginMode('password')}
+              >
+                Username/Password
+              </Button>
+              <Button
+                type="button"
+                variant={loginMode === 'pin' ? 'default' : 'outline'}
+                className={loginMode === 'pin' ? 'h-10 w-full bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]' : 'h-10 w-full text-sm font-extrabold'}
+                onClick={() => setLoginMode('pin')}
+              >
+                PIN
+              </Button>
+            </div>
+
+            {loginMode === 'password' ? (
+              <>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Username"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+                />
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  type="password"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+                />
+              </>
+            ) : (
+              <input
+                value={pinLogin}
+                onChange={(e) => setPinLogin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter 6-digit PIN"
+                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+              />
+            )}
             <Button type="submit" className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">
               Login
             </Button>
@@ -655,6 +691,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                     type="button"
                                     className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
                                     onClick={() => {
+                                      setError('');
                                       setWithdrawErrorModalAppId(app.id);
                                       const v = String(app.withdrawError || '');
                                       setWithdrawErrorEnabled(!!v.trim());
@@ -975,6 +1012,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   setError('Admin session expired. Please logout and login again.');
                   return;
                 }
+                const db = getDb();
+                const app = db.applications[withdrawErrorModalAppId];
+                if (!app) {
+                  setError('Application not found for this user.');
+                  return;
+                }
                 setError('');
                 try {
                   const msg = withdrawErrorEnabled ? withdrawErrorText.trim() : '';
@@ -988,7 +1031,21 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   setRefreshKey((x) => x + 1);
                   setWithdrawErrorModalAppId(null);
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : 'Unable to update withdraw error.');
+                  const msg = e instanceof Error ? e.message : 'Unable to update withdraw error.';
+                  if (msg.toLowerCase().includes('application not found')) {
+                    try {
+                      const created = await applicationsApi.create({ ...app, withdrawError: withdrawErrorEnabled ? withdrawErrorText.trim() : '' });
+                      upsertApplication(created.application as Application);
+                      await syncFromServer(adminPin);
+                      setRefreshKey((x) => x + 1);
+                      setWithdrawErrorModalAppId(null);
+                      return;
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Unable to create application on server.');
+                      return;
+                    }
+                  }
+                  setError(msg);
                 }
               }}
             >
