@@ -263,29 +263,39 @@ function App() {
     }
     const userId = session.userId;
     Promise.allSettled([
-      usersApi.getUser(userId).then((res) => {
-        const existing = getDb().users[userId];
-        const next = res.user;
-        if (next.disabledLogin) {
+      usersApi
+        .getUser(userId)
+        .then((res) => {
+          const existing = getDb().users[userId];
+          const next = res.user;
+          if (next.disabledLogin) {
+            setSession(null);
+            try {
+              localStorage.setItem('take_easy_loan_blocked_notice', 'Your account is blocked. Please contact customer service.');
+            } catch {
+            }
+            setCurrentView('auth');
+            return;
+          }
+          upsertUser({
+            id: next.id,
+            gender: (next.gender as never) || existing?.gender || 'Male',
+            phoneOrEmail: next.phoneOrEmail,
+            password: existing?.password || '',
+            inviteCode: next.inviteCode || existing?.inviteCode || '',
+            createdAt: next.createdAt || existing?.createdAt || Date.now(),
+            lastApplicationId: next.lastApplicationId,
+            disabledLogin: !!next.disabledLogin,
+          });
+        })
+        .catch(() => {
           setSession(null);
           try {
-            localStorage.setItem('take_easy_loan_blocked_notice', 'Your account is blocked. Please contact customer service.');
+            localStorage.setItem('take_easy_loan_blocked_notice', 'Your account was removed. Please register again.');
           } catch {
           }
           setCurrentView('auth');
-          return;
-        }
-        upsertUser({
-          id: next.id,
-          gender: (next.gender as never) || existing?.gender || 'Male',
-          phoneOrEmail: next.phoneOrEmail,
-          password: existing?.password || '',
-          inviteCode: next.inviteCode || existing?.inviteCode || '',
-          createdAt: next.createdAt || existing?.createdAt || Date.now(),
-          lastApplicationId: next.lastApplicationId,
-          disabledLogin: !!next.disabledLogin,
-        });
-      }),
+        }),
       applicationsApi.getLatest(userId).then((res) => {
         if (res.application) upsertApplication(res.application as never);
       }),

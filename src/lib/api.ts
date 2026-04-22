@@ -192,6 +192,11 @@ export const adminApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify(patch),
     }),
+  deleteUser: (adminPin: string, userId: string) =>
+    request<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-pin': adminPin },
+    }),
 };
 
 export const agentApi = {

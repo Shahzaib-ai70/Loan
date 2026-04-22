@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Eye, KeyRound, Pencil, Users } from 'lucide-react';
+import { Eye, KeyRound, Pencil, Trash2, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
@@ -8,6 +8,7 @@ import {
   type Application,
   type LoanStatus,
   type User,
+  deleteUserLocal,
   getDb,
   getSession,
   getUserBalance,
@@ -792,6 +793,30 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                     <Pencil className="mr-1 h-3 w-3" /> Withdraw Error
                                   </Button>
                                 )}
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700"
+                                  onClick={async () => {
+                                    const yes = window.confirm('Delete this user and all related details?');
+                                    if (!yes) return;
+                                    const adminPin = getDb().admin.pin.trim();
+                                    if (!adminPin) {
+                                      setError('Admin session expired. Please logout and login again.');
+                                      return;
+                                    }
+                                    setError('');
+                                    try {
+                                      await adminApi.deleteUser(adminPin, u.id);
+                                      deleteUserLocal(u.id);
+                                      await syncFromServer(adminPin);
+                                      setRefreshKey((x) => x + 1);
+                                    } catch (e) {
+                                      setError(e instanceof Error ? e.message : 'Unable to delete user.');
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="mr-1 h-3 w-3" /> Delete
+                                </Button>
                               </div>
                             </td>
                           </tr>

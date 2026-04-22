@@ -368,3 +368,19 @@ export const setAdminPin = (pin: string) => {
   db.admin.pin = pin;
   saveDb(db);
 };
+
+export const deleteUserLocal = (userId: string) => {
+  const db = getDb();
+  const appsToDelete = Object.values(db.applications).filter((a) => a.userId === userId);
+  for (const app of appsToDelete) delete db.applications[app.id];
+  delete db.balances[userId];
+  delete db.users[userId];
+  if (db.session?.isLoggedIn && db.session.userId === userId) {
+    db.session = null;
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+    }
+  }
+  saveDb(db);
+};

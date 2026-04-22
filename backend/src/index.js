@@ -621,6 +621,20 @@ app.delete('/api/agent/users/:userId', requireAgent, (req, res) => {
   res.json({ ok: true });
 });
 
+app.delete('/api/admin/users/:userId', requireAdmin, (req, res) => {
+  const { userId } = req.params;
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  db.prepare('DELETE FROM applications WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM balances WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM chat_messages WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  res.json({ ok: true });
+});
+
 app.put('/api/admin/applications/:appId', requireAdmin, (req, res) => {
   const { appId } = req.params;
   const row = db.prepare('SELECT payload_json FROM applications WHERE id = ?').get(appId);
