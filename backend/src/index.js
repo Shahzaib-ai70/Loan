@@ -109,10 +109,16 @@ app.post('/api/auth/register', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { loginId = '', password = '' } = req.body || {};
   const user = db
-    .prepare('SELECT id, gender, phone_or_email, password, created_at, last_application_id, agent_id FROM users WHERE lower(phone_or_email) = ?')
+    .prepare(
+      'SELECT id, gender, phone_or_email, password, created_at, last_application_id, agent_id, disabled_login FROM users WHERE lower(phone_or_email) = ?',
+    )
     .get(normalize(loginId));
   if (!user || user.password !== String(password)) {
     res.status(401).json({ message: 'Invalid login details.' });
+    return;
+  }
+  if (Number(user.disabled_login || 0) === 1) {
+    res.status(403).json({ message: 'Login disabled. Please contact support.' });
     return;
   }
 
@@ -129,6 +135,7 @@ app.post('/api/auth/login', (req, res) => {
       createdAt: user.created_at,
       lastApplicationId: user.last_application_id || undefined,
       agentId: user.agent_id || undefined,
+      disabledLogin: Number(user.disabled_login || 0) === 1,
     },
     latestApplication,
     session: { isLoggedIn: true, userId: user.id, lastLoginAt: now() },
@@ -282,7 +289,7 @@ app.post('/api/agent/login', (req, res) => {
 
 app.get('/api/admin/overview', requireAdmin, (_req, res) => {
   const users = db
-    .prepare('SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id FROM users ORDER BY created_at DESC')
+    .prepare('SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, disabled_login FROM users ORDER BY created_at DESC')
     .all();
   const applicationsRows = db.prepare('SELECT payload_json FROM applications ORDER BY submitted_at DESC').all();
   const applications = applicationsRows.map((r) => JSON.parse(r.payload_json));
@@ -301,6 +308,7 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       createdAt: u.created_at,
       lastApplicationId: u.last_application_id,
       agentId: u.agent_id || undefined,
+      disabledLogin: Number(u.disabled_login || 0) === 1,
     })),
     applications,
     balances,
@@ -356,7 +364,9 @@ app.post('/api/admin/agents', requireAdmin, (req, res) => {
 app.get('/api/agent/overview', requireAgent, (req, res) => {
   const agent = req.agent;
   const users = db
-    .prepare('SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id FROM users WHERE agent_id = ? ORDER BY created_at DESC')
+    .prepare(
+      'SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, disabled_login FROM users WHERE agent_id = ? ORDER BY created_at DESC',
+    )
     .all(agent.id);
   const applicationsRows = db
     .prepare(
@@ -387,6 +397,7 @@ app.get('/api/agent/overview', requireAgent, (req, res) => {
       createdAt: u.created_at,
       lastApplicationId: u.last_application_id,
       agentId: u.agent_id || undefined,
+      disabledLogin: Number(u.disabled_login || 0) === 1,
     })),
     applications,
     balances,
@@ -441,7 +452,9 @@ app.patch('/api/agent/users/:userId', requireAgent, (req, res) => {
   const agent = req.agent;
   const { userId } = req.params;
   const user = db
-    .prepare('SELECT id, gender, phone_or_email, password, invite_code, created_at, last_application_id, agent_id FROM users WHERE id = ? AND agent_id = ?')
+    .prepare(
+      'SELECT id, gender, phone_or_email, password, invite_code, created_at, last_application_id, agent_id, disabled_login FROM users WHERE id = ? AND agent_id = ?',
+    )
     .get(userId, agent.id);
   if (!user) {
     res.status(404).json({ message: 'User not found.' });
@@ -451,6 +464,7 @@ app.patch('/api/agent/users/:userId', requireAgent, (req, res) => {
   const nextPhone = String(req.body?.phoneOrEmail || user.phone_or_email).trim();
   const nextPassword = req.body?.password == null ? String(user.password) : String(req.body.password);
   const nextInviteCode = req.body?.inviteCode == null ? String(user.invite_code || '') : String(req.body.inviteCode || '');
+  const nextDisabled = req.body?.disabledLogin == null ? Number(user.disabled_login || 0) : req.body.disabledLogin ? 1 : 0;
   if (!nextPhone) {
     res.status(400).json({ message: 'Phone/Email is required.' });
     return;
@@ -462,11 +476,12 @@ app.patch('/api/agent/users/:userId', requireAgent, (req, res) => {
     res.status(409).json({ message: 'Phone/Email already exists.' });
     return;
   }
-  db.prepare('UPDATE users SET gender = ?, phone_or_email = ?, password = ?, invite_code = ? WHERE id = ?').run(
+  db.prepare('UPDATE users SET gender = ?, phone_or_email = ?, password = ?, invite_code = ?, disabled_login = ? WHERE id = ?').run(
     nextGender,
     nextPhone,
     nextPassword,
     nextInviteCode,
+    nextDisabled,
     userId,
   );
   res.json({
@@ -478,6 +493,56 @@ app.patch('/api/agent/users/:userId', requireAgent, (req, res) => {
       lastApplicationId: user.last_application_id || undefined,
       agentId: user.agent_id || undefined,
       inviteCode: nextInviteCode || undefined,
+      disabledLogin: nextDisabled === 1,
+    },
+  });
+});
+
+app.patch('/api/admin/users/:userId', requireAdmin, (req, res) => {
+  const { userId } = req.params;
+  const user = db
+    .prepare(
+      'SELECT id, gender, phone_or_email, password, invite_code, created_at, last_application_id, agent_id, disabled_login FROM users WHERE id = ?',
+    )
+    .get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  const nextGender = String(req.body?.gender || user.gender);
+  const nextPhone = String(req.body?.phoneOrEmail || user.phone_or_email).trim();
+  const nextPassword = req.body?.password == null ? String(user.password) : String(req.body.password);
+  const nextInviteCode = req.body?.inviteCode == null ? String(user.invite_code || '') : String(req.body.inviteCode || '');
+  const nextDisabled = req.body?.disabledLogin == null ? Number(user.disabled_login || 0) : req.body.disabledLogin ? 1 : 0;
+  if (!nextPhone) {
+    res.status(400).json({ message: 'Phone/Email is required.' });
+    return;
+  }
+  const existsLogin = db
+    .prepare('SELECT id FROM users WHERE lower(phone_or_email) = ? AND id != ?')
+    .get(normalize(nextPhone), userId);
+  if (existsLogin) {
+    res.status(409).json({ message: 'Phone/Email already exists.' });
+    return;
+  }
+  db.prepare('UPDATE users SET gender = ?, phone_or_email = ?, password = ?, invite_code = ?, disabled_login = ? WHERE id = ?').run(
+    nextGender,
+    nextPhone,
+    nextPassword,
+    nextInviteCode,
+    nextDisabled,
+    userId,
+  );
+  res.json({
+    user: {
+      id: userId,
+      gender: nextGender,
+      phoneOrEmail: nextPhone,
+      createdAt: user.created_at,
+      lastApplicationId: user.last_application_id || undefined,
+      agentId: user.agent_id || undefined,
+      inviteCode: nextInviteCode || undefined,
+      disabledLogin: nextDisabled === 1,
     },
   });
 });

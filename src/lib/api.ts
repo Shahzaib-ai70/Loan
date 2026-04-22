@@ -56,6 +56,8 @@ export type ApiUser = {
   createdAt: number;
   lastApplicationId?: string;
   agentId?: string;
+  inviteCode?: string;
+  disabledLogin?: boolean;
 };
 
 export type AdminOverviewResponse = {
@@ -178,6 +180,12 @@ export const adminApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ currentBalance }),
     }),
+  updateUser: (adminPin: string, userId: string, patch: { gender?: string; phoneOrEmail?: string; password?: string; inviteCode?: string; disabledLogin?: boolean }) =>
+    request<{ user: ApiUser }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify(patch),
+    }),
 };
 
 export const agentApi = {
@@ -197,7 +205,11 @@ export const agentApi = {
       headers: { 'x-agent-key': agentKey },
       body: JSON.stringify({ currentBalance }),
     }),
-  updateUser: (agentKey: string, userId: string, patch: { gender?: string; phoneOrEmail?: string; password?: string; inviteCode?: string }) =>
+  updateUser: (
+    agentKey: string,
+    userId: string,
+    patch: { gender?: string; phoneOrEmail?: string; password?: string; inviteCode?: string; disabledLogin?: boolean },
+  ) =>
     request<{ user: ApiUser & { inviteCode?: string } }>(`/api/agent/users/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       headers: { 'x-agent-key': agentKey },

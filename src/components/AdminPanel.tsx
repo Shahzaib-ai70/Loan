@@ -167,7 +167,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           inviteCode: '',
           createdAt: u.createdAt,
           lastApplicationId: u.lastApplicationId,
-          disabledLogin: false,
+          disabledLogin: !!u.disabledLogin,
         });
       }
       for (const a of overview.applications) {
@@ -414,13 +414,28 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       return;
     }
     const willDisable = !u.disabledLogin;
-    upsertUser({ ...u, disabledLogin: willDisable });
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) {
+      setError('Admin session expired. Please logout and login again.');
+      return;
+    }
+    setError('');
+    adminApi
+      .updateUser(adminPin, userId, { disabledLogin: willDisable })
+      .then(() => syncFromServer(adminPin))
+      .then(() => {
+        const next = getDb().users[userId];
+        if (next) upsertUser({ ...next, disabledLogin: willDisable });
+        setRefreshKey((x) => x + 1);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to update user.');
+      });
     const session = getSession();
     if (willDisable && session?.userId === userId) {
       setSession(null);
       localStorage.setItem(BLOCKED_NOTICE_KEY, 'Your account is blocked. Please contact customer service.');
     }
-    setRefreshKey((x) => x + 1);
   };
 
   const updatePassword = () => {
@@ -432,10 +447,23 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       setError('User record missing for password update.');
       return;
     }
-    upsertUser({ ...u, password: newPassword.trim() });
-    setPasswordModalUserId(null);
-    setNewPassword('');
-    setRefreshKey((x) => x + 1);
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) {
+      setError('Admin session expired. Please logout and login again.');
+      return;
+    }
+    setError('');
+    adminApi
+      .updateUser(adminPin, passwordModalUserId, { password: newPassword.trim() })
+      .then(() => {
+        upsertUser({ ...u, password: newPassword.trim() });
+        setPasswordModalUserId(null);
+        setNewPassword('');
+        setRefreshKey((x) => x + 1);
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Unable to update password.');
+      });
   };
 
   if (!adminLoggedIn) {

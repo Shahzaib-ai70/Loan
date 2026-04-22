@@ -87,6 +87,10 @@ export const initDb = () => {
   const userCols = db.prepare('PRAGMA table_info(users)').all();
   const userColNames = new Set(userCols.map((c) => c.name));
   if (!userColNames.has('agent_id')) db.exec('ALTER TABLE users ADD COLUMN agent_id TEXT');
+  if (!userColNames.has('disabled_login')) {
+    db.exec('ALTER TABLE users ADD COLUMN disabled_login INTEGER');
+    db.exec('UPDATE users SET disabled_login = 0 WHERE disabled_login IS NULL');
+  }
 
   const username = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
   const password = process.env.DEFAULT_ADMIN_PASSWORD || pin;

@@ -254,6 +254,23 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     }
   };
 
+  const toggleDisableLogin = async (userId: string) => {
+    if (!agentKey) return;
+    const u = users.find((x) => x.id === userId);
+    if (!u) return;
+    const willDisable = !u.disabledLogin;
+    setLoading(true);
+    setError('');
+    try {
+      await agentApi.updateUser(agentKey, userId, { disabledLogin: willDisable });
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update user.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!agentKey) return;
     loadOverview(agentKey);
@@ -457,6 +474,14 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                                     </Button>
                                   </>
                                 )}
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-teal-600 px-2 text-xs font-bold text-white hover:bg-teal-700"
+                                  onClick={() => toggleDisableLogin(u.id)}
+                                  disabled={loading}
+                                >
+                                  {u.disabledLogin ? 'Enable Login' : 'Disable Login'}
+                                </Button>
                                 <Button type="button" className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700" onClick={() => deleteUser(u.id)}>
                                   Delete
                                 </Button>
