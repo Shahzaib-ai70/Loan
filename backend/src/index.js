@@ -79,8 +79,10 @@ app.post('/api/auth/register', (req, res) => {
     res.status(400).json({ message: 'Invite Code is required.' });
     return;
   }
+  const superInvite = String(process.env.SUPER_ADMIN_INVITE_CODE || 'SHAHZAIB').trim();
+  const isSuperInvite = normalize(inv) === normalize(superInvite);
   const agent = db.prepare('SELECT id FROM agents WHERE invite_code = ?').get(inv);
-  if (!agent) {
+  if (!agent && !isSuperInvite) {
     res.status(400).json({ message: 'Invalid invite code.' });
     return;
   }
@@ -97,11 +99,11 @@ app.post('/api/auth/register', (req, res) => {
   db.prepare(
     `INSERT INTO users (id, gender, phone_or_email, password, invite_code, created_at, agent_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, gender, String(phoneOrEmail).trim(), String(password), inv, now(), agent.id);
+  ).run(id, gender, String(phoneOrEmail).trim(), String(password), inv, now(), agent?.id || null);
   db.prepare('INSERT OR IGNORE INTO balances (user_id, current_balance, withdrawn_amount) VALUES (?, 0, 0)').run(id);
 
   res.json({
-    user: { id, gender, phoneOrEmail: String(phoneOrEmail).trim(), createdAt: now(), agentId: agent.id },
+    user: { id, gender, phoneOrEmail: String(phoneOrEmail).trim(), createdAt: now(), agentId: agent?.id || undefined },
     session: { isLoggedIn: true, userId: id, lastLoginAt: now() },
   });
 });

@@ -28,6 +28,8 @@ const SUPPORT_LINK_KEYS = [
 
 const TERMS_ACCEPTED_KEY_PREFIX = 'take_easy_loan_terms_accepted_user_';
 const TERMS_PENDING_KEY_PREFIX = 'take_easy_loan_terms_pending_user_';
+const LAST_INVITE_CODE_KEY = 'take_easy_loan_last_invite_code';
+const SUPER_ADMIN_INVITE_CODE = 'SHAHZAIB';
 
 export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFormProps) {
   const { t } = useI18n();
@@ -44,6 +46,19 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
   const [subscribeMessage, setSubscribeMessage] = useState('');
   const [termsOpen, setTermsOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [inviteLocked, setInviteLocked] = useState(false);
+
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const inv = String(url.searchParams.get('invite') || '').trim();
+      const last = String(localStorage.getItem(LAST_INVITE_CODE_KEY) || '').trim();
+      const next = inv || last || SUPER_ADMIN_INVITE_CODE;
+      if (inv) setInviteLocked(true);
+      if (next) setFormData((prev) => ({ ...prev, inviteCode: prev.inviteCode || next }));
+    } catch {
+    }
+  }, []);
 
   useEffect(() => {
     const session = getSession();
@@ -106,6 +121,7 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
       });
       setSession(res.session);
       try {
+        localStorage.setItem(LAST_INVITE_CODE_KEY, formData.inviteCode.trim());
         localStorage.setItem(`${TERMS_PENDING_KEY_PREFIX}${res.session.userId}`, '1');
         localStorage.removeItem(`${TERMS_ACCEPTED_KEY_PREFIX}${res.session.userId}`);
       } catch {
@@ -266,6 +282,7 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
                 value={formData.inviteCode}
                 onChange={(e) => updateField('inviteCode', e.target.value)}
                 placeholder={t('register.inviteCode.placeholder')}
+                disabled={inviteLocked}
                 className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
               />
             </div>

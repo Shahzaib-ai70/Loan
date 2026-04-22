@@ -32,6 +32,15 @@ const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-n
 const BLOCKED_NOTICE_KEY = 'take_easy_loan_blocked_notice';
 const ADMIN_SECTION_KEY = 'take_easy_loan_admin_section';
 const TERM_OPTIONS: number[] = [3, 6, 12, 24, 36, 48, 60, 90, 120];
+const OPERATOR_NAME_KEY = 'take_easy_loan_admin_operator_name';
+const SUPER_ADMIN_INVITE_CODE = 'SHAHZAIB';
+
+const generateInviteCode = () => {
+  const chars = '0123456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+};
 
 const isSection = (value: string): value is Section =>
   ['dashboard', 'customers', 'loans', 'support', 'agents'].includes(value);
@@ -41,6 +50,13 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState<'password' | 'pin'>('password');
   const [pinLogin, setPinLogin] = useState('');
+  const [operatorName, setOperatorName] = useState(() => {
+    try {
+      return localStorage.getItem(OPERATOR_NAME_KEY) || 'Admin';
+    } catch {
+      return 'Admin';
+    }
+  });
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -138,6 +154,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     return agents.filter((a) => `${a.username} ${a.inviteCode}`.toLowerCase().includes(normalized));
   }, [agentSearch, agents]);
 
+  const agentNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of agents) map[a.id] = a.username;
+    return map;
+  }, [agents]);
+
   const ensureUserForApp = (app: Application): User => {
     const db = getDb();
     const existing = db.users[app.userId];
@@ -209,9 +231,9 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (!adminPin) return;
     const u = agentUsername.trim();
     const p = agentPassword;
-    const inv = agentInviteCode.trim();
-    if (!u || !p || !inv) {
-      setError('Username, password and invite code are required.');
+    const inv = agentInviteCode.trim() || generateInviteCode();
+    if (!u || !p) {
+      setError('Username and password are required.');
       return;
     }
     setAgentsLoading(true);
@@ -240,9 +262,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           : await adminApi.login({ username, password });
       setAdminPin(res.adminPin);
       setAdminSession(true);
+      try {
+        const nextOp = loginMode === 'password' ? username.trim() || 'Admin' : 'Admin';
+        localStorage.setItem(OPERATOR_NAME_KEY, nextOp);
+        setOperatorName(nextOp);
+      } catch {
+      }
       setPassword('');
       setPinLogin('');
       await syncFromServer(res.adminPin);
+      loadAgents();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid admin login.');
     }
@@ -251,19 +280,14 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   useEffect(() => {
     if (!adminLoggedIn) return;
     syncFromServer();
-  }, [adminLoggedIn]);
-
-  useEffect(() => {
-    if (!adminLoggedIn) return;
-    if (section !== 'agents') return;
     loadAgents();
-  }, [adminLoggedIn, section]);
+  }, [adminLoggedIn]);
 
   useEffect(() => {
     if (!adminLoggedIn) return;
     const id = window.setInterval(() => {
       syncFromServer();
-      if (section === 'agents') loadAgents();
+      loadAgents();
     }, 10000);
     return () => window.clearInterval(id);
   }, [adminLoggedIn, section]);
@@ -544,7 +568,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
 
   const totalCustomers = users.length;
   const totalLoans = apps.length;
-  const totalAgents = 3;
+  const totalAgents = agents.length;
   const totalSupport = 1;
 
   return (
@@ -568,7 +592,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             <div className="text-3xl font-light text-slate-500">≡</div>
             <div className="flex items-center gap-4 text-sm">
               {syncing && <span className="font-semibold text-slate-500">Syncing…</span>}
-              <span className="font-semibold text-slate-500">Operator: Pablo</span>
+              <span className="font-semibold text-slate-500">Operator: {operatorName || 'Admin'}</span>
               <Button className="h-8 rounded bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700" onClick={logout}>
                 Logout
               </Button>
@@ -621,7 +645,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   <table className="min-w-[1200px] w-full text-left text-sm">
                     <thead className="border-y border-slate-200 bg-white text-slate-700">
                       <tr>
-                        {['ID', 'Date', 'Account Code', 'Full Name', 'Reference', 'Agent', 'Withdrawal code', 'PIN Code', 'Actions'].map((h) => (
+                        {['ID', 'Date', 'Login (Phone/Email)', 'Account Code', 'Full Name', 'Reference', 'Agent', 'Withdrawal code', 'PIN Code', 'Actions'].map((h) => (
                           <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
                         ))}
                       </tr>
@@ -632,14 +656,21 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                         const rowId = Number(String(u.id).replace(/\D/g, '').slice(-4) || idx + 1000);
                         const date = new Date(u.createdAt).toLocaleDateString();
                         const code = app?.withdrawCode || '';
+                        const agentName =
+                          u.agentId
+                            ? agentNameById[u.agentId] || '-'
+                            : String(u.inviteCode || '').trim().toLowerCase() === SUPER_ADMIN_INVITE_CODE.toLowerCase()
+                              ? 'Super Admin'
+                              : '-';
                         return (
                           <tr key={u.id} className="border-b border-slate-100">
                             <td className="px-3 py-2 font-semibold">{rowId}</td>
                             <td className="px-3 py-2">{date}</td>
+                            <td className="px-3 py-2">{u.phoneOrEmail || '-'}</td>
                             <td className="px-3 py-2">{app?.bank?.accountNumber || '-'}</td>
                             <td className="px-3 py-2">{app?.applicant?.fullName || '-'}</td>
                             <td className="px-3 py-2">{u?.inviteCode || '-'}</td>
-                            <td className="px-3 py-2">OM</td>
+                            <td className="px-3 py-2">{agentName}</td>
                             <td className="px-3 py-2">
                               {app ? (
                                 <Button
@@ -816,6 +847,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   <div>
                     <h2 className="text-4xl font-semibold text-slate-800">Agents</h2>
                     <div className="mt-1 text-sm font-semibold text-slate-500">Create agents and manage invitation codes.</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-500">Super Admin Invite Code: {SUPER_ADMIN_INVITE_CODE}</div>
                   </div>
                   <Button
                     type="button"
@@ -824,7 +856,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                       setAgentModalOpen(true);
                       setAgentUsername('');
                       setAgentPassword('');
-                      setAgentInviteCode('');
+                      setAgentInviteCode(generateInviteCode());
                     }}
                   >
                     Add Agent
@@ -1085,13 +1117,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           />
           <input
             value={agentInviteCode}
-            onChange={(e) => setAgentInviteCode(e.target.value.replace(/\s+/g, '').slice(0, 24))}
-            placeholder="Invite code (unique)"
+            readOnly
+            placeholder="Invite code (auto)"
             className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]"
           />
           <div className="flex gap-2">
             <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={createAgent} disabled={agentsLoading}>
               {agentsLoading ? 'Creating…' : 'Create'}
+            </Button>
+            <Button type="button" variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setAgentInviteCode(generateInviteCode())}>
+              Regenerate
             </Button>
             <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setAgentModalOpen(false)}>
               Cancel
