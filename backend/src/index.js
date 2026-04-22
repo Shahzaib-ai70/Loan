@@ -79,7 +79,7 @@ app.post('/api/auth/register', (req, res) => {
     res.status(400).json({ message: 'Invite Code is required.' });
     return;
   }
-  const superInvite = String(process.env.SUPER_ADMIN_INVITE_CODE || 'SHAHZAIB').trim();
+  const superInvite = String(process.env.SUPER_ADMIN_INVITE_CODE || '12345678').trim();
   const isSuperInvite = normalize(inv) === normalize(superInvite);
   const agent = db.prepare('SELECT id FROM agents WHERE invite_code = ?').get(inv);
   if (!agent && !isSuperInvite) {

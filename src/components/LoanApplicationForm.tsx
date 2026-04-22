@@ -29,7 +29,7 @@ const SUPPORT_LINK_KEYS = [
 const TERMS_ACCEPTED_KEY_PREFIX = 'take_easy_loan_terms_accepted_user_';
 const TERMS_PENDING_KEY_PREFIX = 'take_easy_loan_terms_pending_user_';
 const LAST_INVITE_CODE_KEY = 'take_easy_loan_last_invite_code';
-const SUPER_ADMIN_INVITE_CODE = 'SHAHZAIB';
+const SUPER_ADMIN_INVITE_CODE = '12345678';
 
 export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFormProps) {
   const { t } = useI18n();

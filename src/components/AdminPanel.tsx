@@ -33,7 +33,7 @@ const BLOCKED_NOTICE_KEY = 'take_easy_loan_blocked_notice';
 const ADMIN_SECTION_KEY = 'take_easy_loan_admin_section';
 const TERM_OPTIONS: number[] = [3, 6, 12, 24, 36, 48, 60, 90, 120];
 const OPERATOR_NAME_KEY = 'take_easy_loan_admin_operator_name';
-const SUPER_ADMIN_INVITE_CODE = 'SHAHZAIB';
+const SUPER_ADMIN_INVITE_CODE = '12345678';
 
 const generateInviteCode = () => {
   const chars = '0123456789';
