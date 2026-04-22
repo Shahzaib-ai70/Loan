@@ -13,7 +13,7 @@ const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 
 
 export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const user = useMemo(() => getCurrentUser(), []);
+  const user = getCurrentUser();
   const app = useMemo(() => (user ? getLatestApplicationForUser(user.id) : null), [refreshKey, user?.id]);
   const balance = useMemo(
     () => (user ? getUserBalance(user.id) : { currentBalance: 0, withdrawnAmount: 0 }),

@@ -202,6 +202,31 @@ app.get('/api/users/:userId/balance', (req, res) => {
   });
 });
 
+app.get('/api/users/:userId', (req, res) => {
+  const { userId } = req.params;
+  const user = db
+    .prepare(
+      'SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, invite_code, disabled_login FROM users WHERE id = ?',
+    )
+    .get(userId);
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  res.json({
+    user: {
+      id: user.id,
+      gender: user.gender,
+      phoneOrEmail: user.phone_or_email,
+      createdAt: user.created_at,
+      lastApplicationId: user.last_application_id || undefined,
+      agentId: user.agent_id || undefined,
+      inviteCode: user.invite_code || undefined,
+      disabledLogin: Number(user.disabled_login || 0) === 1,
+    },
+  });
+});
+
 app.put('/api/users/:userId/balance', requireAdmin, (req, res) => {
   const amount = Number(req.body?.currentBalance || 0);
   const old = db.prepare('SELECT withdrawn_amount FROM balances WHERE user_id = ?').get(req.params.userId);

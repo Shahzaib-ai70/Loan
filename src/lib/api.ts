@@ -237,6 +237,7 @@ export const applicationsApi = {
 };
 
 export const usersApi = {
+  getUser: (userId: string) => request<{ user: ApiUser }>(`/api/users/${encodeURIComponent(userId)}`),
   getBalance: (userId: string) =>
     request<{ balance: { currentBalance: number; withdrawnAmount: number } }>(`/api/users/${encodeURIComponent(userId)}/balance`),
 };

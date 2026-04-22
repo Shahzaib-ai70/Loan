@@ -24,12 +24,17 @@ import { DepositRatesPage } from './components/DepositRatesPage';
 import { WebsiteNotWorking } from './components/WebsiteNotWorking';
 import { Modal } from './components/Modal';
 import { Button } from './components/ui/Button';
+import { applicationsApi, usersApi } from './lib/api';
 import {
   ensureMigration,
   getCurrentUser,
+  getDb,
   getLatestApplicationForUser,
   getSession,
+  setUserBalance,
   setSession,
+  upsertApplication,
+  upsertUser,
 } from './lib/db';
 
 export type View =
@@ -208,6 +213,56 @@ function App() {
     if (currentView !== 'loan-application' && currentView !== 'application-status' && currentView !== 'withdraw') return;
     const session = getSession();
     if (!session?.isLoggedIn) setCurrentView('auth');
+  }, [currentView]);
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.isLoggedIn) return;
+    if (
+      currentView !== 'profile' &&
+      currentView !== 'application-status' &&
+      currentView !== 'withdraw' &&
+      currentView !== 'my-information' &&
+      currentView !== 'my-information-id' &&
+      currentView !== 'my-information-contact' &&
+      currentView !== 'my-information-bank' &&
+      currentView !== 'my-information-signature' &&
+      currentView !== 'loan-contract'
+    ) {
+      return;
+    }
+    const userId = session.userId;
+    Promise.allSettled([
+      usersApi.getUser(userId).then((res) => {
+        const existing = getDb().users[userId];
+        const next = res.user;
+        if (next.disabledLogin) {
+          setSession(null);
+          try {
+            localStorage.setItem('take_easy_loan_blocked_notice', 'Your account is blocked. Please contact customer service.');
+          } catch {
+          }
+          setCurrentView('auth');
+          return;
+        }
+        upsertUser({
+          id: next.id,
+          gender: (next.gender as never) || existing?.gender || 'Male',
+          phoneOrEmail: next.phoneOrEmail,
+          password: existing?.password || '',
+          inviteCode: next.inviteCode || existing?.inviteCode || '',
+          createdAt: next.createdAt || existing?.createdAt || Date.now(),
+          lastApplicationId: next.lastApplicationId,
+          disabledLogin: !!next.disabledLogin,
+        });
+      }),
+      applicationsApi.getLatest(userId).then((res) => {
+        if (res.application) upsertApplication(res.application as never);
+      }),
+      usersApi.getBalance(userId).then((res) => {
+        setUserBalance(userId, res.balance);
+      }),
+    ]).catch(() => {});
   }, [currentView]);
 
   const handleAuthLogin = useCallback(() => {
