@@ -164,7 +164,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           gender: (u.gender as User['gender']) || 'Male',
           phoneOrEmail: u.phoneOrEmail,
           password: '',
-          inviteCode: '',
+          inviteCode: u.inviteCode || '',
           createdAt: u.createdAt,
           lastApplicationId: u.lastApplicationId,
           disabledLogin: !!u.disabledLogin,
@@ -629,8 +629,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                   const user = db.users[u.id];
                                   if (!user) return;
                                   const next = prompt('Enter new invite code', user.inviteCode || '') ?? user.inviteCode;
-                                  upsertUser({ ...user, inviteCode: next });
-                                  setRefreshKey((x) => x + 1);
+                                  const adminPin = getDb().admin.pin.trim();
+                                  if (!adminPin) return;
+                                  adminApi.updateUser(adminPin, u.id, { inviteCode: next })
+                                    .then(() => syncFromServer(adminPin))
+                                    .then(() => setRefreshKey((x) => x + 1))
+                                    .catch((e) => setError(e instanceof Error ? e.message : 'Unable to update invite code.'));
                                 }}>
                                   <KeyRound className="mr-1 h-3 w-3" /> Edit Invite Code
                                 </Button>

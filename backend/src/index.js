@@ -110,7 +110,7 @@ app.post('/api/auth/login', (req, res) => {
   const { loginId = '', password = '' } = req.body || {};
   const user = db
     .prepare(
-      'SELECT id, gender, phone_or_email, password, created_at, last_application_id, agent_id, disabled_login FROM users WHERE lower(phone_or_email) = ?',
+      'SELECT id, gender, phone_or_email, password, created_at, last_application_id, agent_id, invite_code, disabled_login FROM users WHERE lower(phone_or_email) = ?',
     )
     .get(normalize(loginId));
   if (!user || user.password !== String(password)) {
@@ -135,6 +135,7 @@ app.post('/api/auth/login', (req, res) => {
       createdAt: user.created_at,
       lastApplicationId: user.last_application_id || undefined,
       agentId: user.agent_id || undefined,
+      inviteCode: user.invite_code || undefined,
       disabledLogin: Number(user.disabled_login || 0) === 1,
     },
     latestApplication,
@@ -314,7 +315,9 @@ app.post('/api/agent/login', (req, res) => {
 
 app.get('/api/admin/overview', requireAdmin, (_req, res) => {
   const users = db
-    .prepare('SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, disabled_login FROM users ORDER BY created_at DESC')
+    .prepare(
+      'SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, invite_code, disabled_login FROM users ORDER BY created_at DESC',
+    )
     .all();
   const applicationsRows = db.prepare('SELECT payload_json FROM applications ORDER BY submitted_at DESC').all();
   const applications = applicationsRows.map((r) => JSON.parse(r.payload_json));
@@ -333,6 +336,7 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       createdAt: u.created_at,
       lastApplicationId: u.last_application_id,
       agentId: u.agent_id || undefined,
+      inviteCode: u.invite_code || undefined,
       disabledLogin: Number(u.disabled_login || 0) === 1,
     })),
     applications,
@@ -390,7 +394,7 @@ app.get('/api/agent/overview', requireAgent, (req, res) => {
   const agent = req.agent;
   const users = db
     .prepare(
-      'SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, disabled_login FROM users WHERE agent_id = ? ORDER BY created_at DESC',
+      'SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, invite_code, disabled_login FROM users WHERE agent_id = ? ORDER BY created_at DESC',
     )
     .all(agent.id);
   const applicationsRows = db
@@ -422,6 +426,7 @@ app.get('/api/agent/overview', requireAgent, (req, res) => {
       createdAt: u.created_at,
       lastApplicationId: u.last_application_id,
       agentId: u.agent_id || undefined,
+      inviteCode: u.invite_code || undefined,
       disabledLogin: Number(u.disabled_login || 0) === 1,
     })),
     applications,
