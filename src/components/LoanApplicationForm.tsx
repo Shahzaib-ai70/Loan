@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { CheckCircle2, ChevronRight, LockKeyhole, Smartphone } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Modal } from './Modal';
 import { authApi } from '../lib/api';
 import { setSession, upsertUser, type Gender } from '../lib/db';
 
@@ -36,6 +37,8 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
   const [submitted, setSubmitted] = useState(false);
   const [subscribeEmail, setSubscribeEmail] = useState('');
   const [subscribeMessage, setSubscribeMessage] = useState('');
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const updateField = <K extends keyof RegisterFormData>(key: K, value: RegisterFormData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -83,7 +86,8 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
         disabledLogin: false,
       });
       setSession(res.session);
-      window.setTimeout(() => onRegistered(), 600);
+      setTermsAccepted(false);
+      setTermsOpen(true);
     } catch (e) {
       setSubmitted(false);
       const msg = e instanceof Error ? e.message : 'Unable to create account.';
@@ -102,6 +106,45 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8">
+      <Modal open={termsOpen} title="Loan Terms & Conditions" onClose={() => {}} maxWidthClassName="max-w-lg">
+        <div className="space-y-4 text-sm text-slate-700">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="font-extrabold text-slate-900">Please read before you continue</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700">
+              <li>Information you submit must be correct and complete.</li>
+              <li>If your application has mistakes or false information, a verification/processing fee may be charged.</li>
+              <li>By continuing, you agree to these terms.</li>
+            </ul>
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4">
+            <input
+              type="radio"
+              name="termsAccepted"
+              checked={termsAccepted}
+              onChange={() => setTermsAccepted(true)}
+              className="mt-1 h-4 w-4 accent-[#0b4a90]"
+            />
+            <span className="font-semibold">I have read and agree to the Terms & Conditions.</span>
+          </label>
+
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              type="button"
+              disabled={!termsAccepted}
+              onClick={() => {
+                if (!termsAccepted) return;
+                setTermsOpen(false);
+                onRegistered();
+              }}
+              className="h-11 rounded-md bg-[#0b4a90] px-8 text-sm font-extrabold text-white hover:bg-[#083a70] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Continue
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-4 text-sm text-slate-500">
           <span className="font-semibold text-slate-700">Home</span> <span className="mx-2">|</span>{' '}
