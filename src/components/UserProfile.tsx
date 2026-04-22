@@ -1,8 +1,8 @@
-import { ChevronRight, FileSignature, FileText, Info, LogOut, UserRound } from 'lucide-react';
+import { ChevronRight, FileSignature, FileText, Info, LogOut, ScrollText, UserRound } from 'lucide-react';
 import { getCurrentUser, getLatestApplicationForUser } from '../lib/db';
 
 type UserProfileProps = {
-  onNavigate: (to: 'my-information' | 'application-status' | 'loan-contract' | 'auth') => void;
+  onNavigate: (to: 'my-information' | 'application-status' | 'loan-contract' | 'terms-and-conditions' | 'auth') => void;
   onLogout: () => void;
 };
 
@@ -89,6 +89,16 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </button>
 
+        <button type="button" className={optionRow} onClick={() => onNavigate('terms-and-conditions')}>
+          <div className={iconBox}>
+            <ScrollText className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-extrabold text-slate-900">Terms & Conditions</div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400" />
+        </button>
+
         <button
           type="button"
           className="flex w-full items-center gap-4 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-4 text-left shadow-sm hover:bg-red-100"
@@ -111,4 +121,3 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
     </div>
   );
 }
-
