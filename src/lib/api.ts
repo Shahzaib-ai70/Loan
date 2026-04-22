@@ -111,6 +111,12 @@ export type LatestApplicationResponse = {
   application: unknown | null;
 };
 
+export type WithdrawResponse = {
+  message: string;
+  amount: number;
+  balance: { currentBalance: number; withdrawnAmount: number };
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -240,6 +246,11 @@ export const usersApi = {
   getUser: (userId: string) => request<{ user: ApiUser }>(`/api/users/${encodeURIComponent(userId)}`),
   getBalance: (userId: string) =>
     request<{ balance: { currentBalance: number; withdrawnAmount: number } }>(`/api/users/${encodeURIComponent(userId)}/balance`),
+};
+
+export const withdrawApi = {
+  withdraw: (params: { userId: string; code: string }) =>
+    request<WithdrawResponse>(`/api/withdraw`, { method: 'POST', body: JSON.stringify(params) }),
 };
 
 export const supportApi = {

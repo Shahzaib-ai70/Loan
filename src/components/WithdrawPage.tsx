@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
-import { applicationsApi, usersApi } from '../lib/api';
+import { applicationsApi, usersApi, withdrawApi } from '../lib/api';
 import { getCurrentUser, getLatestApplicationForUser, getUserBalance, setUserBalance, upsertApplication } from '../lib/db';
 
 type WithdrawPageProps = {
@@ -81,39 +81,31 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
       setNoticeOpen(true);
       return;
     }
-    const expected = (app.withdrawCode ?? '').trim();
-    if (!expected) {
-      setError('OTP Expired');
-      setNoticeTitle('OTP Expired');
-      setNoticeMessage('Withdraw code not assigned yet. Please contact customer service.');
-      setNoticeOpen(true);
-      return;
-    }
-    if (code.trim() !== expected) {
-      setError('OTP Expired');
-      setNoticeTitle('OTP Expired');
-      setNoticeMessage('Invalid or expired withdrawal code. Please request a new OTP from customer service.');
-      setNoticeOpen(true);
-      return;
-    }
-
-    const b = getUserBalance(user.id);
-    if (b.currentBalance <= 0) {
-      setError('No balance available.');
-      setNoticeTitle('Notification');
-      setNoticeMessage('No balance available.');
-      setNoticeOpen(true);
-      return;
-    }
-
-    setWithdrawnNow(b.currentBalance);
-    const updated = {
-      currentBalance: 0,
-      withdrawnAmount: b.withdrawnAmount + b.currentBalance,
-    };
-    setUserBalance(user.id, updated);
-    setSnapshot(updated);
-    setCongratsOpen(true);
+    withdrawApi
+      .withdraw({ userId: user.id, code: code.trim() })
+      .then((res) => {
+        setWithdrawnNow(res.amount || 0);
+        setUserBalance(user.id, res.balance);
+        setSnapshot(res.balance);
+        setCongratsOpen(true);
+        setCode('');
+        return Promise.allSettled([
+          applicationsApi.getLatest(user.id).then((r) => {
+            if (r.application) upsertApplication(r.application as never);
+          }),
+          usersApi.getBalance(user.id).then((r) => {
+            setUserBalance(user.id, r.balance);
+            setSnapshot(r.balance);
+          }),
+        ]);
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : 'Withdraw failed.';
+        setError(msg);
+        setNoticeTitle('Notification');
+        setNoticeMessage(msg);
+        setNoticeOpen(true);
+      });
   };
 
   const onCancel = () => {

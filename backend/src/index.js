@@ -162,6 +162,7 @@ app.post('/api/applications', (req, res) => {
     id,
     submittedAt: payload.submittedAt || now(),
     status: payload.status || 'under_review',
+    withdrawCodeUsedAt: payload.withdrawCodeUsedAt || null,
   };
 
   db.prepare(
@@ -256,8 +257,18 @@ app.post('/api/withdraw', (req, res) => {
     res.status(400).json({ message: 'Loan is not approved yet.' });
     return;
   }
-  if (String(code).trim() !== String(appPayload.withdrawCode || '').trim()) {
-    res.status(400).json({ message: 'Invalid withdraw code.' });
+  const expected = String(appPayload.withdrawCode || '').trim();
+  const provided = String(code || '').trim();
+  if (!expected) {
+    res.status(400).json({ message: 'Withdraw code not assigned yet. Please request a new OTP.' });
+    return;
+  }
+  if (provided !== expected) {
+    res.status(400).json({ message: 'Invalid or expired withdrawal code.' });
+    return;
+  }
+  if (appPayload.withdrawCodeUsedAt) {
+    res.status(400).json({ message: 'Withdraw OTP already used. Please request a new OTP.' });
     return;
   }
   const bal = db.prepare('SELECT current_balance, withdrawn_amount FROM balances WHERE user_id = ?').get(userId);
@@ -268,7 +279,13 @@ app.post('/api/withdraw', (req, res) => {
   }
   const withdrawn = Number(bal?.withdrawn_amount || 0) + current;
   db.prepare('UPDATE balances SET current_balance = 0, withdrawn_amount = ? WHERE user_id = ?').run(withdrawn, userId);
-  res.json({ message: 'Withdraw successful', amount: current });
+  const updated = { ...appPayload, withdrawCodeUsedAt: now() };
+  db.prepare('UPDATE applications SET payload_json = ? WHERE id = ?').run(JSON.stringify(updated), user.last_application_id);
+  res.json({
+    message: 'Withdraw successful',
+    amount: current,
+    balance: { currentBalance: 0, withdrawnAmount: withdrawn },
+  });
 });
 
 app.post('/api/admin/login', (req, res) => {
@@ -450,6 +467,11 @@ app.put('/api/agent/applications/:appId', requireAgent, (req, res) => {
   }
   const oldPayload = JSON.parse(row.payload_json);
   const updated = { ...oldPayload, ...req.body, id: appId };
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'withdrawCode')) {
+    const oldCode = String(oldPayload.withdrawCode || '').trim();
+    const nextCode = String(req.body?.withdrawCode || '').trim();
+    if (oldCode !== nextCode) updated.withdrawCodeUsedAt = null;
+  }
   db.prepare('UPDATE applications SET status = ?, approved_at = ?, withdraw_code = ?, payload_json = ? WHERE id = ?').run(
     updated.status || oldPayload.status,
     updated.approvedAt || oldPayload.approvedAt || null,
@@ -601,6 +623,11 @@ app.put('/api/admin/applications/:appId', requireAdmin, (req, res) => {
   }
   const oldPayload = JSON.parse(row.payload_json);
   const updated = { ...oldPayload, ...req.body, id: appId };
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'withdrawCode')) {
+    const oldCode = String(oldPayload.withdrawCode || '').trim();
+    const nextCode = String(req.body?.withdrawCode || '').trim();
+    if (oldCode !== nextCode) updated.withdrawCodeUsedAt = null;
+  }
   db.prepare('UPDATE applications SET status = ?, approved_at = ?, withdraw_code = ?, payload_json = ? WHERE id = ?').run(
     updated.status || oldPayload.status,
     updated.approvedAt || oldPayload.approvedAt || null,
