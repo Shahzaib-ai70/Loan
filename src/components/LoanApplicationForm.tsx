@@ -112,7 +112,10 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
             <div className="font-extrabold text-slate-900">Please read before you continue</div>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700">
               <li>Information you submit must be correct and complete.</li>
+              <li>You may be asked to provide documents for verification.</li>
               <li>If your application has mistakes or false information, a verification/processing fee may be charged.</li>
+              <li>If approved, you agree to repay the loan on time and follow the repayment terms shown in your contract.</li>
+              <li>We may contact you by phone/email for updates and verification.</li>
               <li>By continuing, you agree to these terms.</li>
             </ul>
           </div>
