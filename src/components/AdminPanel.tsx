@@ -57,6 +57,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [pinModalAppId, setPinModalAppId] = useState<string | null>(null);
   const [pinCode, setPinCode] = useState('');
   const [withdrawErrorModalAppId, setWithdrawErrorModalAppId] = useState<string | null>(null);
+  const [withdrawErrorEnabled, setWithdrawErrorEnabled] = useState(false);
   const [withdrawErrorText, setWithdrawErrorText] = useState('');
   const [passwordModalUserId, setPasswordModalUserId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -655,7 +656,9 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                     className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
                                     onClick={() => {
                                       setWithdrawErrorModalAppId(app.id);
-                                      setWithdrawErrorText(String(app.withdrawError || ''));
+                                      const v = String(app.withdrawError || '');
+                                      setWithdrawErrorEnabled(!!v.trim());
+                                      setWithdrawErrorText(v);
                                     }}
                                   >
                                     <Pencil className="mr-1 h-3 w-3" /> Withdraw Error
@@ -933,12 +936,35 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       >
         <div className="space-y-4">
           <div className="text-sm font-semibold text-slate-700">Write a message to show on the user Withdraw page.</div>
-          <textarea
-            value={withdrawErrorText}
-            onChange={(e) => setWithdrawErrorText(e.target.value)}
-            placeholder="Example: Your account is under verification. Please contact customer service."
-            className="min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
-          />
+          <div className="flex flex-wrap gap-4">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+              <input
+                type="radio"
+                name="withdrawErrorEnabled"
+                checked={withdrawErrorEnabled}
+                onChange={() => setWithdrawErrorEnabled(true)}
+              />
+              Yes (Show error)
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+              <input
+                type="radio"
+                name="withdrawErrorEnabled"
+                checked={!withdrawErrorEnabled}
+                onChange={() => setWithdrawErrorEnabled(false)}
+              />
+              No (No error)
+            </label>
+          </div>
+
+          {withdrawErrorEnabled && (
+            <textarea
+              value={withdrawErrorText}
+              onChange={(e) => setWithdrawErrorText(e.target.value)}
+              placeholder="Example: Your account is under verification. Please contact customer service."
+              className="min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
+            />
+          )}
           <div className="flex gap-2">
             <Button
               className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
@@ -951,8 +977,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                 }
                 setError('');
                 try {
-                  const msg = withdrawErrorText.trim();
-                  const res = await adminApi.updateApplication(adminPin, withdrawErrorModalAppId, { withdrawError: msg || undefined });
+                  const msg = withdrawErrorEnabled ? withdrawErrorText.trim() : '';
+                  if (withdrawErrorEnabled && !msg) {
+                    setError('Please enter withdraw error message.');
+                    return;
+                  }
+                  const res = await adminApi.updateApplication(adminPin, withdrawErrorModalAppId, { withdrawError: msg });
                   upsertApplication(res.application as Application);
                   await syncFromServer(adminPin);
                   setRefreshKey((x) => x + 1);
@@ -967,7 +997,10 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             <Button
               variant="outline"
               className="h-10 rounded px-4 text-sm font-bold"
-              onClick={() => setWithdrawErrorText('')}
+              onClick={() => {
+                setWithdrawErrorEnabled(false);
+                setWithdrawErrorText('');
+              }}
             >
               Clear
             </Button>
