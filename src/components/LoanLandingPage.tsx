@@ -13,6 +13,7 @@ import {
 import heroImage from '../assets/hero-image.jpg';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { useI18n } from '../lib/i18n';
 
 interface LoanLandingPageProps {
   onNavigate: (
@@ -39,34 +40,35 @@ type Slide = {
 };
 
 export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
+  const { t } = useI18n();
   const slides = useMemo<Slide[]>(
     () => [
       {
-        title: 'Digital Banking Solutions',
-        subtitle: 'Fast loans. Secure banking. Simple experience.',
-        badge: 'Secure & Trusted',
+        title: t('home.slides.1.title'),
+        subtitle: t('home.slides.1.subtitle'),
+        badge: t('home.slides.1.badge'),
         image: heroImage,
       },
       {
-        title: 'Loan Approval in Minutes',
-        subtitle: 'Transparent terms, flexible repayment, professional support.',
-        badge: 'Fast Processing',
+        title: t('home.slides.2.title'),
+        subtitle: t('home.slides.2.subtitle'),
+        badge: t('home.slides.2.badge'),
         image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=1600',
       },
       {
-        title: 'Manage Your Loan',
-        subtitle: 'Track status, view contract, and withdraw when approved.',
-        badge: 'Mobile Friendly',
+        title: t('home.slides.3.title'),
+        subtitle: t('home.slides.3.subtitle'),
+        badge: t('home.slides.3.badge'),
         image: 'https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&q=80&w=1600',
       },
       {
-        title: 'Exclusive Rates & Offers',
-        subtitle: 'Get rate updates and new loan offers directly to your inbox.',
-        badge: 'Better Rates',
+        title: t('home.slides.4.title'),
+        subtitle: t('home.slides.4.subtitle'),
+        badge: t('home.slides.4.badge'),
         image: 'https://images.unsplash.com/photo-1559526324-593bc073d938?auto=format&fit=crop&q=80&w=1600',
       },
     ],
-    [],
+    [t],
   );
 
   const [activeSlide, setActiveSlide] = useState(0);
@@ -110,14 +112,14 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                               className="h-11 w-full rounded-full bg-white px-6 font-extrabold text-[#0b4a90] hover:bg-white/90 sm:w-auto"
                               onClick={() => onNavigate('loan-application')}
                             >
-                              Apply Loan
+                              {t('home.applyLoan')}
                             </Button>
                             <Button
                               variant="ghost"
                               className="h-11 w-full rounded-full px-6 font-extrabold text-white hover:bg-white/10 sm:w-auto"
                               onClick={() => onNavigate('auth')}
                             >
-                              Sign In
+                              {t('home.signIn')}
                             </Button>
                           </div>
                         </div>
@@ -158,8 +160,8 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                 <Sparkles className="h-6 w-6" />
               </span>
               <span className="text-left">
-                <div className="text-sm font-extrabold text-slate-900">Attractive Offers</div>
-                <div className="mt-0.5 text-xs font-semibold text-slate-500">New rates and promotions</div>
+                <div className="text-sm font-extrabold text-slate-900">{t('home.cards.offers.title')}</div>
+                <div className="mt-0.5 text-xs font-semibold text-slate-500">{t('home.cards.offers.subtitle')}</div>
               </span>
             </button>
             <button
@@ -171,8 +173,8 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                 <TrendingUp className="h-6 w-6" />
               </span>
               <span className="text-left">
-                <div className="text-sm font-extrabold text-slate-900">Exchange Rates</div>
-                <div className="mt-0.5 text-xs font-semibold text-slate-500">Daily market updates</div>
+                <div className="text-sm font-extrabold text-slate-900">{t('home.cards.exchange.title')}</div>
+                <div className="mt-0.5 text-xs font-semibold text-slate-500">{t('home.cards.exchange.subtitle')}</div>
               </span>
             </button>
             <button
@@ -184,8 +186,8 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                 <PiggyBank className="h-6 w-6" />
               </span>
               <span className="text-left">
-                <div className="text-sm font-extrabold text-slate-900">Deposit Rates</div>
-                <div className="mt-0.5 text-xs font-semibold text-slate-500">Secure savings options</div>
+                <div className="text-sm font-extrabold text-slate-900">{t('home.cards.deposit.title')}</div>
+                <div className="mt-0.5 text-xs font-semibold text-slate-500">{t('home.cards.deposit.subtitle')}</div>
               </span>
             </button>
 
@@ -198,8 +200,8 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                 <Headset className="h-6 w-6" />
               </span>
               <span className="text-left">
-                <div className="text-sm font-extrabold text-slate-900">Customer Service</div>
-                <div className="mt-0.5 text-xs font-semibold text-slate-500">WhatsApp • Telegram • Live Chat</div>
+                <div className="text-sm font-extrabold text-slate-900">{t('home.cards.support.title')}</div>
+                <div className="mt-0.5 text-xs font-semibold text-slate-500">{t('home.cards.support.subtitle')}</div>
               </span>
             </button>
           </div>
@@ -209,7 +211,7 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
       <section className="bg-white">
         <div className="mx-auto max-w-[1100px] px-4 py-8 sm:py-12">
           <div className="border-b border-slate-200 pb-4">
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">PERSONAL LOAN</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{t('home.personalLoan.title')}</h2>
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
@@ -222,27 +224,26 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-[#0b4a90] sm:text-xl">Fast approval. Clear terms.</h3>
+              <h3 className="text-lg font-bold text-[#0b4a90] sm:text-xl">{t('home.personalLoan.headline')}</h3>
               <p className="text-sm leading-6 text-slate-600 sm:text-base">
-                Apply for a personal loan with flexible repayment options. Get a quick decision, transparent fees,
-                and a smooth digital application experience.
+                {t('home.personalLoan.body')}
               </p>
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4a90] hover:underline"
                 onClick={() => onNavigate('loan-application')}
               >
-                Apply Loan <ChevronRight className="h-4 w-4" />
+                {t('home.applyLoan')} <ChevronRight className="h-4 w-4" />
               </button>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                  <div className="text-xs font-semibold text-slate-500">APR</div>
-                  <div className="mt-1 text-lg font-extrabold text-slate-900">From 6.99%</div>
+                  <div className="text-xs font-semibold text-slate-500">{t('home.personalLoan.aprLabel')}</div>
+                  <div className="mt-1 text-lg font-extrabold text-slate-900">{t('home.personalLoan.aprValue')}</div>
                 </div>
                 <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                  <div className="text-xs font-semibold text-slate-500">Amount</div>
-                  <div className="mt-1 text-lg font-extrabold text-slate-900">Up to $100k</div>
+                  <div className="text-xs font-semibold text-slate-500">{t('home.personalLoan.amountLabel')}</div>
+                  <div className="mt-1 text-lg font-extrabold text-slate-900">{t('home.personalLoan.amountValue')}</div>
                 </div>
               </div>
             </div>
@@ -254,10 +255,10 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
         <div className="mx-auto max-w-[1100px] px-4 py-10 sm:py-14">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
             {[
-              { icon: ShieldCheck, title: 'Protected Data', desc: 'Modern security standards for your information.' },
-              { icon: TrendingUp, title: 'Live Status', desc: 'Track application and loan status anytime.' },
-              { icon: Percent, title: 'Transparent Rates', desc: 'Clear terms, no hidden surprises.' },
-              { icon: PhoneCall, title: 'Customer Support', desc: 'Get OTP and support from customer service.' },
+              { icon: ShieldCheck, title: t('home.features.1.title'), desc: t('home.features.1.desc') },
+              { icon: TrendingUp, title: t('home.features.2.title'), desc: t('home.features.2.desc') },
+              { icon: Percent, title: t('home.features.3.title'), desc: t('home.features.3.desc') },
+              { icon: PhoneCall, title: t('home.features.4.title'), desc: t('home.features.4.desc') },
             ].map((x) => {
               const Icon = x.icon;
               return (
@@ -275,18 +276,17 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center">
             <div className="space-y-3">
               <h3 className="text-lg font-extrabold text-[#0b4a90] sm:text-xl">
-                Guarantee Commitment Information Lookup
+                {t('home.lookup.title')}
               </h3>
               <p className="text-sm leading-6 text-slate-600 sm:text-base">
-                Quickly look up guarantee information and commitment details for your application. Built for speed,
-                accuracy, and security.
+                {t('home.lookup.body')}
               </p>
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4a90] hover:underline"
                 onClick={() => onNavigate('auth')}
               >
-                Sign in to continue <ChevronRight className="h-4 w-4" />
+                {t('home.lookup.cta')} <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
@@ -308,25 +308,25 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
               <div className="space-y-3 text-white">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide ring-1 ring-white/15">
                   <Percent className="h-4 w-4" />
-                  Better rates, better experience
+                  {t('home.mobile.badge')}
                 </div>
-                <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Our Loan App on Mobile Devices</h3>
+                <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{t('home.mobile.title')}</h3>
                 <p className="text-sm leading-6 text-white/80 sm:text-base">
-                  Track applications, upload documents, and manage repayments from your phone—anytime, anywhere.
+                  {t('home.mobile.body')}
                 </p>
                 <div className="flex gap-3 pt-2">
                   <Button
                     className="h-11 rounded-full bg-white px-6 font-bold text-[#0b4a90] hover:bg-white/90"
                     onClick={() => onNavigate('loan-application')}
                   >
-                    Apply Now
+                    {t('home.mobile.applyNow')}
                   </Button>
                   <Button
                     variant="ghost"
                     className="h-11 rounded-full px-6 font-bold text-white hover:bg-white/10"
                     onClick={() => onNavigate('auth')}
                   >
-                    Sign In
+                    {t('home.signIn')}
                   </Button>
                 </div>
               </div>
@@ -351,17 +351,17 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
         <div className="mx-auto max-w-[1100px] px-4 py-10 sm:py-12">
           <div className="grid grid-cols-1 gap-6 rounded-3xl bg-white/10 p-6 ring-1 ring-white/15 sm:p-10 lg:grid-cols-2 lg:items-center">
             <div className="text-white">
-              <h3 className="text-xl font-extrabold sm:text-2xl">Subscribe for Loan Offers & Updates</h3>
-              <p className="mt-2 text-sm text-white/80">Get new loan offers, rate updates, and product announcements.</p>
+              <h3 className="text-xl font-extrabold sm:text-2xl">{t('home.subscribe.title')}</h3>
+              <p className="mt-2 text-sm text-white/80">{t('home.subscribe.body')}</p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Input
-                placeholder="Your email..."
+                placeholder={t('home.subscribe.placeholder')}
                 className="h-12 w-full rounded-full border-0 bg-white/95 px-5 text-slate-900 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-white/40"
               />
               <Button className="h-12 rounded-full bg-[#0b4a90] px-6 font-bold text-white hover:bg-[#093b74]">
-                Subscribe
+                {t('home.subscribe.button')}
               </Button>
             </div>
           </div>
@@ -372,27 +372,27 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
         <div className="mx-auto max-w-[1100px] px-4 py-10">
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
             <div className="space-y-3">
-              <h4 className="text-sm font-extrabold text-slate-900">Support</h4>
+              <h4 className="text-sm font-extrabold text-slate-900">{t('home.footer.support')}</h4>
               <ul className="space-y-2 text-sm text-slate-600">
                 <li>
                   <a href="#" className="hover:text-slate-900">
-                    Products & Services
+                    {t('home.footer.productsServices')}
                   </a>
                 </li>
                 <li>
                   <a href="#" className="hover:text-slate-900">
-                    Tools
+                    {t('home.footer.tools')}
                   </a>
                 </li>
                 <li>
                   <a href="#" className="hover:text-slate-900">
-                    Contact
+                    {t('home.footer.contact')}
                   </a>
                 </li>
               </ul>
             </div>
             <div className="space-y-3">
-              <h4 className="text-sm font-extrabold text-slate-900">Follow Us</h4>
+              <h4 className="text-sm font-extrabold text-slate-900">{t('home.footer.followUs')}</h4>
               <ul className="space-y-2 text-sm text-slate-600">
                 <li>
                   <a href="#" className="hover:text-slate-900">
@@ -413,14 +413,14 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
             </div>
             <div className="col-span-2 sm:col-span-1">
               <div className="rounded-2xl bg-[#f5f8ff] p-5 ring-1 ring-slate-200">
-                <div className="text-sm font-extrabold text-[#0b4a90]">Secure Banking</div>
-                <p className="mt-1 text-sm text-slate-600">Your data is protected with modern security standards.</p>
+                <div className="text-sm font-extrabold text-[#0b4a90]">{t('home.footer.secureBanking')}</div>
+                <p className="mt-1 text-sm text-slate-600">{t('home.footer.secureBankingBody')}</p>
               </div>
             </div>
           </div>
 
           <div className="mt-10 border-t border-slate-200 pt-6 text-center text-xs text-slate-500">
-            © Copyright VersaBank
+            {t('home.footer.copyright')}
           </div>
         </div>
       </footer>

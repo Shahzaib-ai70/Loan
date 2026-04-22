@@ -13,12 +13,14 @@ const LANGUAGE_KEY = 'take_easy_loan_language';
 const detectLanguage = (): Language => {
   try {
     const stored = localStorage.getItem(LANGUAGE_KEY);
-    if (stored === 'en' || stored === 'fr' || stored === 'es') return stored;
+    if (stored === 'en' || stored === 'fr' || stored === 'es' || stored === 'pt-BR' || stored === 'de') return stored;
   } catch {
   }
   const nav = (navigator.languages?.[0] || navigator.language || '').toLowerCase();
   if (nav.startsWith('fr')) return 'fr';
   if (nav.startsWith('es')) return 'es';
+  if (nav === 'pt-br' || nav.startsWith('pt')) return 'pt-BR';
+  if (nav.startsWith('de')) return 'de';
   return 'en';
 };
 
@@ -70,4 +72,3 @@ export const useI18n = () => {
   if (!ctx) throw new Error('useI18n must be used within I18nProvider');
   return ctx;
 };
-
