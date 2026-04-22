@@ -55,24 +55,21 @@ export type View =
   | 'live-chat';
 
 const VIEW_KEY = 'take_easy_loan_current_view';
-const PUBLIC_PATH_PREFIXES = ['/online-ca'] as const;
 const DEFAULT_PUBLIC_PATH_PREFIX = '/online-ca';
 const ADMIN_PATH = '/drugload-admin';
 const AGENT_PATH = '/drugload-agent';
 
-const parsePath = (pathname: string) => {
-  const p = String(pathname || '/').replace(/\/+$/, '') || '/';
-  const match = PUBLIC_PATH_PREFIXES.find((prefix) => p === prefix || p.startsWith(`${prefix}/`));
-  if (!match) return { base: '', rest: p };
-  const restRaw = p.slice(match.length) || '/';
-  return { base: match, rest: restRaw.startsWith('/') ? restRaw : `/${restRaw}` };
+const normalizePath = (pathname: string) => {
+  const p = String(pathname || '/').trim();
+  const normalized = p.replace(/\/+$/, '') || '/';
+  return normalized;
 };
 
 const isAllowedPublicPath = (pathname: string) => {
-  const { base, rest } = parsePath(pathname);
-  if (base) return true;
-  if (rest === ADMIN_PATH) return true;
-  if (rest === AGENT_PATH) return true;
+  const p = normalizePath(pathname);
+  if (p === DEFAULT_PUBLIC_PATH_PREFIX) return true;
+  if (p === ADMIN_PATH) return true;
+  if (p === AGENT_PATH) return true;
   return false;
 };
 
@@ -114,8 +111,8 @@ function App() {
   const [alreadyAppliedOpen, setAlreadyAppliedOpen] = useState(false);
   const [publicBasePath] = useState(() => {
     try {
-      const { base } = parsePath(window.location.pathname || '/');
-      return base || DEFAULT_PUBLIC_PATH_PREFIX;
+      const p = normalizePath(window.location.pathname || '/');
+      return p === DEFAULT_PUBLIC_PATH_PREFIX ? DEFAULT_PUBLIC_PATH_PREFIX : DEFAULT_PUBLIC_PATH_PREFIX;
     } catch {
       return DEFAULT_PUBLIC_PATH_PREFIX;
     }
@@ -129,9 +126,9 @@ function App() {
   })();
   const [currentView, setCurrentView] = useState<View>(() => {
     try {
-      const { rest } = parsePath(window.location.pathname || '/');
-      if (rest === ADMIN_PATH) return 'admin';
-      if (rest === AGENT_PATH) return 'agent';
+      const p = normalizePath(window.location.pathname || '/');
+      if (p === ADMIN_PATH) return 'admin';
+      if (p === AGENT_PATH) return 'agent';
       const urlView = new URLSearchParams(window.location.search).get('view');
       if (urlView && isView(urlView)) return urlView;
       const raw = localStorage.getItem(VIEW_KEY);
@@ -250,11 +247,7 @@ function App() {
   if (blockedPath) {
     return (
       <Layout onNavigate={navigate} hideHeader hideFooter>
-        <WebsiteNotWorking
-          officialHome={`${window.location.origin}${DEFAULT_PUBLIC_PATH_PREFIX}?view=dashboard`}
-          officialAdmin={`${window.location.origin}${ADMIN_PATH}`}
-          officialAgent={`${window.location.origin}${AGENT_PATH}`}
-        />
+        <WebsiteNotWorking />
       </Layout>
     );
   }
