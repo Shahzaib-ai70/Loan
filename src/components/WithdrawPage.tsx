@@ -21,7 +21,6 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   );
 
   const [code, setCode] = useState('');
-  const [error, setError] = useState('');
   const [congratsOpen, setCongratsOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState('Notification');
@@ -65,7 +64,6 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   }, [app, user]);
 
   const onWithdraw = () => {
-    setError('');
     if (!user) {
       onNavigate('auth');
       return;
@@ -77,7 +75,6 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
       return;
     }
     if (!approved) {
-      setError('Your loan is under review until admin approves.');
       setNoticeTitle('Notification');
       setNoticeMessage('Your loan is under review until admin approves.');
       setNoticeOpen(true);
@@ -112,7 +109,6 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
 
   const onCancel = () => {
     setCode('');
-    setError('');
   };
 
   const agreementDate = app?.approvedAt ?? app?.submittedAt ?? Date.now();
