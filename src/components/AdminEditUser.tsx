@@ -237,6 +237,11 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
                 <EditInput label="Loan Term (months)" value={String(draftApp.loan.termMonths)} onChange={(v) => setDraftApp({ ...draftApp, loan: { ...draftApp.loan, termMonths: Number(v) || 0 } })} />
                 <EditInput label="Current Balance" value={balanceInput} onChange={(v) => setBalanceInput(v)} />
                 <EditInput label="Withdraw Code" value={draftApp.withdrawCode || ''} onChange={(v) => setDraftApp({ ...draftApp, withdrawCode: v })} />
+                <EditTextArea
+                  label="Withdraw Error (show on user withdraw page)"
+                  value={draftApp.withdrawError || ''}
+                  onChange={(v) => setDraftApp({ ...draftApp, withdrawError: v })}
+                />
               </Grid2>
             </Box>
 
@@ -286,6 +291,19 @@ function EditInput({ label, value, onChange }: { label: string; value: string; o
     <div>
       <div className="mb-1 text-[11px] font-bold text-slate-700">{label}</div>
       <input value={value} onChange={(e) => onChange(e.target.value)} className={field} />
+    </div>
+  );
+}
+
+function EditTextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <div className="mb-1 text-[11px] font-bold text-slate-700">{label}</div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${field} min-h-[44px] py-2`}
+      />
     </div>
   );
 }

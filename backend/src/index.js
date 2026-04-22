@@ -257,6 +257,11 @@ app.post('/api/withdraw', (req, res) => {
     res.status(400).json({ message: 'Loan is not approved yet.' });
     return;
   }
+  const manualError = String(appPayload.withdrawError || '').trim();
+  if (manualError) {
+    res.status(400).json({ message: manualError });
+    return;
+  }
   const expected = String(appPayload.withdrawCode || '').trim();
   const provided = String(code || '').trim();
   if (!expected) {

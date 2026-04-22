@@ -29,6 +29,7 @@ export type Application = {
   status: LoanStatus;
   statusLabel?: string;
   statusNote?: string;
+  withdrawError?: string;
   submittedAt: number;
   applicant: {
     fullName: string;

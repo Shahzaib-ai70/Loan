@@ -32,6 +32,7 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   const status = app?.status ?? 'under_review';
   const approved = status === 'approved';
   const rejected = status === 'rejected';
+  const withdrawError = String(app?.withdrawError || '').trim();
 
   useEffect(() => {
     if (!user) return;
@@ -78,6 +79,13 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
       setError('Your loan is under review until admin approves.');
       setNoticeTitle('Notification');
       setNoticeMessage('Your loan is under review until admin approves.');
+      setNoticeOpen(true);
+      return;
+    }
+    if (withdrawError) {
+      setError(withdrawError);
+      setNoticeTitle('Notification');
+      setNoticeMessage(withdrawError);
       setNoticeOpen(true);
       return;
     }
@@ -152,6 +160,12 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
         <div className="mt-2 text-center text-3xl font-extrabold">${money(snapshot.withdrawnAmount)}</div>
       </div>
 
+      {withdrawError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700 shadow-sm">
+          {withdrawError}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="text-sm font-extrabold text-slate-900">Enter Withdrawal Code</div>
         <input
@@ -172,7 +186,7 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
             type="button"
             className="h-11 rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]"
             onClick={onWithdraw}
-            disabled={!approved}
+            disabled={!approved || !!withdrawError}
           >
             WITHDRAW
           </Button>
