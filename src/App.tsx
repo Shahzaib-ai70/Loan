@@ -61,7 +61,7 @@ const ADMIN_PATH = '/drugload-admin';
 const AGENT_PATH = '/drugload-agent';
 
 const parsePath = (pathname: string) => {
-  const p = pathname || '/';
+  const p = String(pathname || '/').replace(/\/+$/, '') || '/';
   const match = PUBLIC_PATH_PREFIXES.find((prefix) => p === prefix || p.startsWith(`${prefix}/`));
   if (!match) return { base: '', rest: p };
   const restRaw = p.slice(match.length) || '/';
