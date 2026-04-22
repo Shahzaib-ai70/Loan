@@ -693,3 +693,11 @@ app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Backend running at http://localhost:${PORT}`);
 });
+
+app.use((req, res) => {
+  if (String(req.path || '').startsWith('/api/')) {
+    res.status(404).json({ message: 'Not found.' });
+    return;
+  }
+  res.status(404).send('Website not working');
+});

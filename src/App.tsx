@@ -21,6 +21,7 @@ import { LiveChat } from './components/LiveChat';
 import { OffersPage } from './components/OffersPage';
 import { ExchangeRatesPage } from './components/ExchangeRatesPage';
 import { DepositRatesPage } from './components/DepositRatesPage';
+import { WebsiteNotWorking } from './components/WebsiteNotWorking';
 import { Modal } from './components/Modal';
 import { Button } from './components/ui/Button';
 import {
@@ -54,7 +55,7 @@ export type View =
   | 'live-chat';
 
 const VIEW_KEY = 'take_easy_loan_current_view';
-const PUBLIC_PATH_PREFIXES = ['/online-ca', '/online.ca', '/onlineca'] as const;
+const PUBLIC_PATH_PREFIXES = ['/online-ca'] as const;
 const DEFAULT_PUBLIC_PATH_PREFIX = '/online-ca';
 const ADMIN_PATH = '/drugload-admin';
 const AGENT_PATH = '/drugload-agent';
@@ -65,6 +66,14 @@ const parsePath = (pathname: string) => {
   if (!match) return { base: '', rest: p };
   const restRaw = p.slice(match.length) || '/';
   return { base: match, rest: restRaw.startsWith('/') ? restRaw : `/${restRaw}` };
+};
+
+const isAllowedPublicPath = (pathname: string) => {
+  const { base, rest } = parsePath(pathname);
+  if (base) return true;
+  if (rest === ADMIN_PATH) return true;
+  if (rest === AGENT_PATH) return true;
+  return false;
 };
 
 const isView = (value: string): value is View =>
@@ -111,11 +120,18 @@ function App() {
       return DEFAULT_PUBLIC_PATH_PREFIX;
     }
   });
+  const blockedPath = (() => {
+    try {
+      return !isAllowedPublicPath(window.location.pathname || '/');
+    } catch {
+      return true;
+    }
+  })();
   const [currentView, setCurrentView] = useState<View>(() => {
     try {
       const { rest } = parsePath(window.location.pathname || '/');
-      if (rest === '/admin' || rest === ADMIN_PATH || rest === '/drugloan-admin') return 'admin';
-      if (rest === '/agent' || rest === AGENT_PATH || rest === '/drugloan-agent') return 'agent';
+      if (rest === ADMIN_PATH) return 'admin';
+      if (rest === AGENT_PATH) return 'agent';
       const urlView = new URLSearchParams(window.location.search).get('view');
       if (urlView && isView(urlView)) return urlView;
       const raw = localStorage.getItem(VIEW_KEY);
@@ -230,6 +246,19 @@ function App() {
     localStorage.removeItem('take_easy_loan_admin_edit_app_id');
     setCurrentView('admin');
   }, []);
+
+  if (blockedPath) {
+    return (
+      <Layout onNavigate={navigate} hideHeader hideFooter>
+        <TopBar onNavigate={navigate} showLogout={!!getSession()?.isLoggedIn} onLogout={handleUserLogout} />
+        <WebsiteNotWorking
+          onGoHome={() => {
+            window.location.href = `${DEFAULT_PUBLIC_PATH_PREFIX}?view=dashboard`;
+          }}
+        />
+      </Layout>
+    );
+  }
 
   return (
     <Layout
