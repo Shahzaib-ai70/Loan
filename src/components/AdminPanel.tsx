@@ -42,6 +42,63 @@ const generateInviteCode = () => {
   return out;
 };
 
+const readFileAsDataUrl = async (file: File): Promise<string> => {
+  const readRaw = () =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('file_read_failed'));
+      reader.readAsDataURL(file);
+    });
+
+  if (!file.type.startsWith('image/')) return readRaw();
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('image_load_failed'));
+      el.src = objectUrl;
+    });
+    const w = img.naturalWidth || img.width || 0;
+    const h = img.naturalHeight || img.height || 0;
+    if (!w || !h) return readRaw();
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return readRaw();
+
+    const MAX_LEN = 45_000;
+    const TARGET_LEN = 40_000;
+    const maxDims = [700, 560, 480, 400, 320];
+    const qualities = [0.78, 0.7, 0.62, 0.56, 0.5];
+
+    for (const maxDim of maxDims) {
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      const targetW = Math.max(1, Math.round(w * scale));
+      const targetH = Math.max(1, Math.round(h * scale));
+      canvas.width = targetW;
+      canvas.height = targetH;
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+
+      for (const q of qualities) {
+        const dataUrl = canvas.toDataURL('image/jpeg', q);
+        if (!dataUrl || dataUrl === 'data:,') continue;
+        if (dataUrl.length <= TARGET_LEN) return dataUrl;
+      }
+    }
+
+    const finalUrl = canvas.toDataURL('image/jpeg', 0.5);
+    if (finalUrl && finalUrl !== 'data:,' && finalUrl.length <= MAX_LEN) return finalUrl;
+    return readRaw();
+  } catch {
+    return readRaw();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 const isSection = (value: string): value is Section =>
   ['dashboard', 'customers', 'loans', 'support', 'agents'].includes(value);
 
@@ -77,6 +134,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [withdrawErrorModalAppId, setWithdrawErrorModalAppId] = useState<string | null>(null);
   const [withdrawErrorEnabled, setWithdrawErrorEnabled] = useState(false);
   const [withdrawErrorText, setWithdrawErrorText] = useState('');
+  const [withdrawErrorMedia, setWithdrawErrorMedia] = useState('');
   const [passwordModalUserId, setPasswordModalUserId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [editLoanAppId, setEditLoanAppId] = useState<string | null>(null);
@@ -725,8 +783,10 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                                       setError('');
                                       setWithdrawErrorModalAppId(app.id);
                                       const v = String(app.withdrawError || '');
+                                      const media = String(app.withdrawErrorMedia || '');
                                       setWithdrawErrorEnabled(!!v.trim());
                                       setWithdrawErrorText(v);
+                                      setWithdrawErrorMedia(media);
                                     }}
                                   >
                                     <Pencil className="mr-1 h-3 w-3" /> Withdraw Error
@@ -1027,12 +1087,44 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           </div>
 
           {withdrawErrorEnabled && (
-            <textarea
-              value={withdrawErrorText}
-              onChange={(e) => setWithdrawErrorText(e.target.value)}
-              placeholder="Example: Your account is under verification. Please contact customer service."
-              className="min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
-            />
+            <>
+              <textarea
+                value={withdrawErrorText}
+                onChange={(e) => setWithdrawErrorText(e.target.value)}
+                placeholder="Example: Your account is under verification. Please contact customer service."
+                className="min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
+              />
+              <div className="space-y-2">
+                <div className="text-sm font-bold text-slate-700">Attach Image (optional)</div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const dataUrl = await readFileAsDataUrl(file);
+                      setWithdrawErrorMedia(String(dataUrl || ''));
+                    } catch {
+                      setError('Unable to read image.');
+                    }
+                  }}
+                />
+                {!!withdrawErrorMedia.trim() && (
+                  <div className="space-y-2">
+                    <img src={withdrawErrorMedia} alt="" className="max-h-64 w-full rounded-xl object-contain" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded px-4 text-xs font-bold"
+                      onClick={() => setWithdrawErrorMedia('')}
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <div className="flex gap-2">
             <Button
@@ -1053,11 +1145,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                 setError('');
                 try {
                   const msg = withdrawErrorEnabled ? withdrawErrorText.trim() : '';
+                  const media = withdrawErrorEnabled ? withdrawErrorMedia.trim() : '';
                   if (withdrawErrorEnabled && !msg) {
                     setError('Please enter withdraw error message.');
                     return;
                   }
-                  const res = await adminApi.updateApplication(adminPin, withdrawErrorModalAppId, { withdrawError: msg });
+                  const res = await adminApi.updateApplication(adminPin, withdrawErrorModalAppId, { withdrawError: msg, withdrawErrorMedia: media });
                   upsertApplication(res.application as Application);
                   await syncFromServer(adminPin);
                   setRefreshKey((x) => x + 1);
@@ -1066,7 +1159,11 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   const msg = e instanceof Error ? e.message : 'Unable to update withdraw error.';
                   if (msg.toLowerCase().includes('application not found')) {
                     try {
-                      const created = await applicationsApi.create({ ...app, withdrawError: withdrawErrorEnabled ? withdrawErrorText.trim() : '' });
+                      const created = await applicationsApi.create({
+                        ...app,
+                        withdrawError: withdrawErrorEnabled ? withdrawErrorText.trim() : '',
+                        withdrawErrorMedia: withdrawErrorEnabled ? withdrawErrorMedia.trim() : '',
+                      });
                       upsertApplication(created.application as Application);
                       await syncFromServer(adminPin);
                       setRefreshKey((x) => x + 1);
@@ -1089,6 +1186,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               onClick={() => {
                 setWithdrawErrorEnabled(false);
                 setWithdrawErrorText('');
+                setWithdrawErrorMedia('');
               }}
             >
               Clear

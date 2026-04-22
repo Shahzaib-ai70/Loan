@@ -25,6 +25,7 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState('Notification');
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [noticeImage, setNoticeImage] = useState('');
   const [snapshot, setSnapshot] = useState(balance);
   const [withdrawnNow, setWithdrawnNow] = useState(0);
 
@@ -71,12 +72,23 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
     if (!app) {
       setNoticeTitle('Notification');
       setNoticeMessage('No application found.');
+      setNoticeImage('');
       setNoticeOpen(true);
       return;
     }
     if (!approved) {
       setNoticeTitle('Notification');
       setNoticeMessage('Your loan is under review until admin approves.');
+      setNoticeImage('');
+      setNoticeOpen(true);
+      return;
+    }
+    const manualError = String(app.withdrawError || '').trim();
+    const manualMedia = String(app.withdrawErrorMedia || '').trim();
+    if (manualError) {
+      setNoticeTitle('Notification');
+      setNoticeMessage(manualError);
+      setNoticeImage(manualMedia);
       setNoticeOpen(true);
       return;
     }
@@ -102,6 +114,7 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
         const msg = e instanceof Error ? e.message : 'Withdraw failed.';
         setNoticeTitle('Notification');
         setNoticeMessage(msg);
+        setNoticeImage('');
         setNoticeOpen(true);
       });
   };
@@ -231,6 +244,9 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
         onClose={() => setNoticeOpen(false)}
       >
         <div className="space-y-3 text-center">
+          {!!noticeImage && (
+            <img src={noticeImage} alt="" className="mx-auto max-h-80 w-full rounded-xl object-contain" />
+          )}
           <div className="text-base font-semibold text-slate-700">{noticeMessage}</div>
           <Button
             type="button"

@@ -30,6 +30,7 @@ export type Application = {
   statusLabel?: string;
   statusNote?: string;
   withdrawError?: string;
+  withdrawErrorMedia?: string;
   submittedAt: number;
   applicant: {
     fullName: string;
