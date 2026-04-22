@@ -1,5 +1,6 @@
 import { ChevronRight, FileSignature, FileText, Info, LogOut, ScrollText, UserRound } from 'lucide-react';
 import { getCurrentUser, getLatestApplicationForUser } from '../lib/db';
+import { useI18n } from '../lib/i18n';
 
 type UserProfileProps = {
   onNavigate: (to: 'my-information' | 'application-status' | 'loan-contract' | 'terms-and-conditions' | 'auth') => void;
@@ -20,6 +21,7 @@ const initialsFrom = (name: string) => {
 };
 
 export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
+  const { t } = useI18n();
   const user = getCurrentUser();
   const app = user ? getLatestApplicationForUser(user.id) : null;
 
@@ -27,14 +29,14 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
     return (
       <div className="mx-auto w-full max-w-[520px] px-4 py-10">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-lg font-extrabold text-slate-900">Please login</div>
-          <div className="mt-1 text-sm font-semibold text-slate-600">Login to view your profile, loan status, and contract.</div>
+          <div className="text-lg font-extrabold text-slate-900">{t('profile.pleaseLogin')}</div>
+          <div className="mt-1 text-sm font-semibold text-slate-600">{t('profile.loginToView')}</div>
           <button
             type="button"
             className="mt-5 h-11 w-full rounded-xl bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]"
             onClick={() => onNavigate('auth')}
           >
-            Go to Login
+            {t('profile.goToLogin')}
           </button>
         </div>
       </div>
@@ -52,7 +54,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
           </div>
         </div>
         <div className="mt-3 text-center">
-          <div className="text-xs font-semibold text-white/85">Welcome Back</div>
+          <div className="text-xs font-semibold text-white/85">{t('profile.welcomeBack')}</div>
           <div className="mt-1 text-2xl font-extrabold">{displayName}</div>
           <div className="mt-1 text-xs font-semibold text-white/80">{user.phoneOrEmail}</div>
         </div>
@@ -64,7 +66,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
             <Info className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-extrabold text-slate-900">My Information</div>
+            <div className="text-sm font-extrabold text-slate-900">{t('profile.myInformation')}</div>
           </div>
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </button>
@@ -74,7 +76,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
             <FileText className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-extrabold text-slate-900">Loan Status</div>
+            <div className="text-sm font-extrabold text-slate-900">{t('profile.loanStatus')}</div>
           </div>
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </button>
@@ -84,7 +86,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
             <FileSignature className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-extrabold text-slate-900">Loan Contract</div>
+            <div className="text-sm font-extrabold text-slate-900">{t('profile.loanContract')}</div>
           </div>
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </button>
@@ -94,7 +96,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
             <ScrollText className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-extrabold text-slate-900">Terms & Conditions</div>
+            <div className="text-sm font-extrabold text-slate-900">{t('profile.terms')}</div>
           </div>
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </button>
@@ -108,7 +110,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
             <LogOut className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-extrabold text-red-600">Logout</div>
+            <div className="text-sm font-extrabold text-red-600">{t('common.logout')}</div>
           </div>
           <ChevronRight className="h-5 w-5 text-red-400" />
         </button>
@@ -116,7 +118,7 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
 
       <div className="mt-6 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
         <UserRound className="h-4 w-4" />
-        Account & application details
+        {t('profile.accountDetails')}
       </div>
     </div>
   );

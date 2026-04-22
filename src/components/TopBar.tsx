@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Bell, LogOut, Menu, MessageCircle, MoreHorizontal, User } from 'lucide-react';
 import { SideMenu, type AppNav } from './SideMenu';
 import { VersaBankLogo } from './ui/VersaBankLogo';
+import { useI18n } from '../lib/i18n';
 
 type TopBarProps = {
   onNavigate: (to: AppNav) => void;
@@ -14,6 +15,7 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const isLoggedIn = !!showLogout;
+  const { language, setLanguage, languages, t } = useI18n();
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -37,7 +39,7 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
             <button
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white/90 hover:bg-white/10"
-              aria-label="Menu"
+              aria-label={t('topbar.menu')}
               onClick={() => setOpen(true)}
             >
               <Menu className="h-5 w-5" />
@@ -49,7 +51,7 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
               <button
                 type="button"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white/90 hover:bg-white/10"
-                aria-label="Notifications"
+                aria-label={t('topbar.notifications')}
               >
                 <Bell className="h-5 w-5" />
               </button>
@@ -57,7 +59,7 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
                 <button
                   type="button"
                   className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white/90 hover:bg-white/10"
-                  aria-label="More"
+                  aria-label={t('topbar.more')}
                   onClick={(e) => {
                     e.stopPropagation();
                     setMoreOpen((v) => !v);
@@ -80,8 +82,23 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
                       }}
                     >
                       <User className="h-4 w-4 text-white/90" />
-                      My Profile
+                      {t('common.profile')}
                     </button>
+
+                    <div className="border-b border-white/10 px-4 py-3">
+                      <div className="text-xs font-extrabold tracking-wide text-white/75">{t('common.language')}</div>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value as never)}
+                        className="mt-2 h-9 w-full rounded-md border border-white/20 bg-white/10 px-2 text-sm font-bold text-white outline-none"
+                      >
+                        {languages.map((l) => (
+                          <option key={l.code} value={l.code} className="text-slate-900">
+                            {l.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
                     <button
                       type="button"
@@ -93,7 +110,7 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
                       }}
                     >
                       <LogOut className="h-4 w-4 text-white/90" />
-                      Logout
+                      {t('common.logout')}
                     </button>
 
                     <button
@@ -105,7 +122,7 @@ export function TopBar({ onNavigate, activeMenuKey, showLogout, onLogout }: TopB
                       }}
                     >
                       <MessageCircle className="h-4 w-4 text-white/90" />
-                      Live Chat
+                      {t('common.liveChat')}
                     </button>
                   </div>
                 )}

@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { VersaBankLogo } from './ui/VersaBankLogo';
+import { useI18n } from '../lib/i18n';
 
 export type AppNav =
   | 'dashboard'
@@ -62,6 +63,7 @@ type SideMenuProps = {
 };
 
 export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onLogout }: SideMenuProps) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -77,6 +79,18 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
   }, [onClose, open]);
 
   if (!open) return null;
+
+  const labelFor = (key: MenuKey) => {
+    if (key === 'Home') return t('menu.home');
+    if (key === 'Online Loan') return t('menu.onlineLoan');
+    if (key === 'Withdraw money') return t('menu.withdrawMoney');
+    if (key === 'Loan Status') return t('menu.loanStatus');
+    if (key === 'News') return t('menu.news');
+    if (key === 'FAQ') return t('menu.faq');
+    if (key === 'Customer Service') return t('menu.customerService');
+    if (key === 'Contact') return t('menu.contact');
+    return t('menu.logout');
+  };
 
   const items: MenuItem[] = [
     { key: 'Home', icon: Home, to: 'dashboard' },
@@ -95,7 +109,7 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
-        aria-label="Close menu"
+        aria-label={t('menu.closeMenu')}
         onClick={onClose}
       />
 
@@ -105,7 +119,7 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
             <button
               type="button"
               className="inline-flex h-11 w-11 items-center justify-center rounded-md text-white/90 hover:bg-white/10"
-              aria-label="Close"
+              aria-label={t('menu.close')}
               onClick={onClose}
             >
               <X className="h-5 w-5" />
@@ -119,14 +133,14 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
               <button
                 type="button"
                 className="inline-flex h-11 w-11 items-center justify-center rounded-md text-white/90 hover:bg-white/10"
-                aria-label="Notifications"
+                aria-label={t('topbar.notifications')}
               >
                 <Bell className="h-5 w-5" />
               </button>
               <button
                 type="button"
                 className="inline-flex h-11 w-11 items-center justify-center rounded-md text-white/90 hover:bg-white/10"
-                aria-label="More"
+                aria-label={t('topbar.more')}
               >
                 <MoreHorizontal className="h-5 w-5" />
               </button>
@@ -155,14 +169,14 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
                     }}
                   >
                     <Icon className="h-4 w-4 text-[#0b4a90]" />
-                    <span className="flex-1">{item.key}</span>
+                    <span className="flex-1">{labelFor(item.key)}</span>
                   </button>
                 );
               })}
           </div>
 
           <div className="px-4 py-6 text-center">
-            <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">HOTLINE</div>
+            <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">{t('register.hotline')}</div>
             <div className="mt-1 text-lg font-extrabold text-slate-900">+1 773 322 9624</div>
           </div>
 
@@ -176,7 +190,7 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
               }}
             >
               <LockKeyhole className="h-4 w-4" />
-              Electronic banking
+              {t('register.electronicBanking')}
             </button>
           </div>
         </div>

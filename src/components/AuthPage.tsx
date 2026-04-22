@@ -4,6 +4,7 @@ import { Input } from './ui/Input';
 import { Label } from './ui/Label';
 import { authApi } from '../lib/api';
 import { getDb, setSession, upsertApplication, upsertUser } from '../lib/db';
+import { useI18n } from '../lib/i18n';
 
 type AuthPageProps = {
   onLogin: () => void;
@@ -11,6 +12,7 @@ type AuthPageProps = {
 };
 
 export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
+  const { t } = useI18n();
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,11 +31,11 @@ export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
     setError('');
 
     if (!loginId.trim()) {
-      setError('Phone or Email is required.');
+      setError(t('auth.phoneOrEmailRequired'));
       return;
     }
     if (!password.trim()) {
-      setError('Password is required.');
+      setError(t('auth.passwordRequired'));
       return;
     }
 
@@ -58,15 +60,15 @@ export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
       onLogin();
     } catch (e) {
       setLoading(false);
-      setError(e instanceof Error ? e.message : 'Invalid login details.');
+      setError(e instanceof Error ? e.message : t('auth.invalidLogin'));
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-10">
       <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <h1 className="text-2xl font-extrabold text-slate-900">Login</h1>
-        <p className="mt-1 text-sm text-slate-600">Use your registered Phone/Email and Password.</p>
+        <h1 className="text-2xl font-extrabold text-slate-900">{t('auth.title')}</h1>
+        <p className="mt-1 text-sm text-slate-600">{t('auth.subtitle')}</p>
 
         {error && (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -77,27 +79,27 @@ export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
         <form className="mt-6 space-y-5" onSubmit={submit}>
           <div className="space-y-2">
             <Label htmlFor="loginId" className="text-sm font-bold text-slate-700">
-              Phone OR Email
+              {t('auth.phoneOrEmailLabel')}
             </Label>
             <Input
               id="loginId"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
-              placeholder="Enter phone or email"
+              placeholder={t('auth.phoneOrEmailPlaceholder')}
               className="h-11 rounded-lg border-slate-300"
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-bold text-slate-700">
-              Password
+              {t('auth.passwordLabel')}
             </Label>
             <Input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              placeholder={t('auth.passwordPlaceholder')}
               className="h-11 rounded-lg border-slate-300"
             />
           </div>
@@ -107,14 +109,14 @@ export function AuthPage({ onLogin, onGoRegister }: AuthPageProps) {
             className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]"
             disabled={loading}
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? t('auth.loggingIn') : t('auth.title')}
           </Button>
         </form>
 
         <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-600">
-          If you don&apos;t have an account,{' '}
+          {t('auth.noAccount')}{' '}
           <button type="button" className="font-extrabold text-[#0b4a90] hover:underline" onClick={onGoRegister}>
-            Register here
+            {t('auth.registerHere')}
           </button>
           .
         </div>
