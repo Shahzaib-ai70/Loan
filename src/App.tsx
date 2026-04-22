@@ -250,11 +250,10 @@ function App() {
   if (blockedPath) {
     return (
       <Layout onNavigate={navigate} hideHeader hideFooter>
-        <TopBar onNavigate={navigate} showLogout={!!getSession()?.isLoggedIn} onLogout={handleUserLogout} />
         <WebsiteNotWorking
-          onGoHome={() => {
-            window.location.href = `${DEFAULT_PUBLIC_PATH_PREFIX}?view=dashboard`;
-          }}
+          officialHome={`${window.location.origin}${DEFAULT_PUBLIC_PATH_PREFIX}?view=dashboard`}
+          officialAdmin={`${window.location.origin}${ADMIN_PATH}`}
+          officialAgent={`${window.location.origin}${AGENT_PATH}`}
         />
       </Layout>
     );
