@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from './ui/Button';
+import { Modal } from './Modal';
 import { agentApi } from '../lib/api';
 import { type Application, type User } from '../lib/db';
 
