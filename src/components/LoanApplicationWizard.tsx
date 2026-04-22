@@ -201,23 +201,37 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
         el.onerror = () => reject(new Error('image_load_failed'));
         el.src = objectUrl;
       });
-      const maxDim = 900;
       const w = img.naturalWidth || img.width || 0;
       const h = img.naturalHeight || img.height || 0;
       if (!w || !h) return readRaw();
 
-      const scale = Math.min(1, maxDim / Math.max(w, h));
-      const targetW = Math.max(1, Math.round(w * scale));
-      const targetH = Math.max(1, Math.round(h * scale));
       const canvas = document.createElement('canvas');
-      canvas.width = targetW;
-      canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return readRaw();
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      if (!dataUrl || dataUrl === 'data:,') return readRaw();
-      return dataUrl;
+
+      const MAX_LEN = 80_000;
+      const TARGET_LEN = 75_000;
+      const maxDims = [900, 720, 600, 480, 360];
+      const qualities = [0.8, 0.72, 0.65, 0.6, 0.55];
+
+      for (const maxDim of maxDims) {
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const targetW = Math.max(1, Math.round(w * scale));
+        const targetH = Math.max(1, Math.round(h * scale));
+        canvas.width = targetW;
+        canvas.height = targetH;
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+
+        for (const q of qualities) {
+          const dataUrl = canvas.toDataURL('image/jpeg', q);
+          if (!dataUrl || dataUrl === 'data:,') continue;
+          if (dataUrl.length <= TARGET_LEN) return dataUrl;
+        }
+      }
+
+      const finalUrl = canvas.toDataURL('image/jpeg', 0.5);
+      if (finalUrl && finalUrl !== 'data:,' && finalUrl.length <= MAX_LEN) return finalUrl;
+      return readRaw();
     } catch {
       return readRaw();
     } finally {
