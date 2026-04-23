@@ -3,7 +3,7 @@ import { Eye, KeyRound, Pencil, Trash2, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
-import { adminApi, applicationsApi, type AgentSummary } from '../lib/api';
+import { adminApi, applicationsApi, type AgentSummary, type Appointment } from '../lib/api';
 import {
   type Application,
   type LoanStatus,
@@ -26,7 +26,7 @@ type AdminPanelProps = {
   onOpenEdit: (appId: string) => void;
 };
 
-type Section = 'dashboard' | 'customers' | 'loans' | 'support' | 'agents';
+type Section = 'dashboard' | 'customers' | 'loans' | 'appointments' | 'support' | 'agents';
 
 const card = 'rounded-sm border border-slate-200 bg-white';
 const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-[#0b4a90]';
@@ -101,7 +101,7 @@ const readFileAsDataUrl = async (file: File): Promise<string> => {
 };
 
 const isSection = (value: string): value is Section =>
-  ['dashboard', 'customers', 'loans', 'support', 'agents'].includes(value);
+  ['dashboard', 'customers', 'loans', 'appointments', 'support', 'agents'].includes(value);
 
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [username, setUsername] = useState('admin');
@@ -154,6 +154,8 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [agentPassword, setAgentPassword] = useState('');
   const [agentInviteCode, setAgentInviteCode] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
 
   const adminLoggedIn = useMemo(() => isAdminLoggedIn(), [refreshKey]);
   const dbSnapshot = useMemo(() => getDb(), [refreshKey]);
@@ -285,6 +287,21 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     }
   };
 
+  const loadAppointments = async () => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    setAppointmentsLoading(true);
+    setError('');
+    try {
+      const res = await adminApi.getAppointments(adminPin);
+      setAppointments(res.appointments || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load appointments.');
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
   const createAgent = async () => {
     const adminPin = getDb().admin.pin.trim();
     if (!adminPin) return;
@@ -340,6 +357,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (!adminLoggedIn) return;
     syncFromServer();
     loadAgents();
+    loadAppointments();
   }, [adminLoggedIn]);
 
   useEffect(() => {
@@ -347,6 +365,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     const id = window.setInterval(() => {
       syncFromServer();
       loadAgents();
+      loadAppointments();
     }, 10000);
     return () => window.clearInterval(id);
   }, [adminLoggedIn, section]);
@@ -629,6 +648,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const totalLoans = apps.length;
   const totalAgents = agents.length;
   const totalSupport = 1;
+  const totalAppointments = appointments.filter((a) => a.status === 'pending').length;
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f5f7fa]">
@@ -641,6 +661,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           <nav className="p-2">
             <SidebarItem label="Customers" count={totalCustomers} active={section === 'customers'} onClick={() => setSection('customers')} />
             <SidebarItem label="Loan List" count={totalLoans} active={section === 'loans'} onClick={() => setSection('loans')} />
+            <SidebarItem label="Appointments" count={totalAppointments} active={section === 'appointments'} onClick={() => setSection('appointments')} />
             <SidebarItem label="Support" count={totalSupport} active={section === 'support'} onClick={() => setSection('support')} />
             <SidebarItem label="Agents" count={totalAgents} active={section === 'agents'} onClick={() => setSection('agents')} />
           </nav>
@@ -920,6 +941,118 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                           </tr>
                         );
                       })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {section === 'appointments' && (
+              <div className={`${card} p-4`}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-4xl font-semibold text-slate-800">Appointments</h2>
+                    <div className="mt-1 text-sm font-semibold text-slate-500">Deposit appointment requests from customers.</div>
+                  </div>
+                  <Button
+                    type="button"
+                    className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700"
+                    onClick={loadAppointments}
+                    disabled={appointmentsLoading}
+                  >
+                    {appointmentsLoading ? 'Loading…' : 'Refresh'}
+                  </Button>
+                </div>
+
+                <div className="mt-5 overflow-x-auto">
+                  <table className="min-w-[1200px] w-full text-left text-sm">
+                    <thead className="border-y border-slate-200 bg-white text-slate-700">
+                      <tr>
+                        {['ID', 'Date', 'User', 'Name', 'Amount', 'Appointment Date', 'Time', 'Location', 'Status', 'Actions'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {appointments.map((a, idx) => {
+                        const rowId = Number(String(a.id).replace(/\D/g, '').slice(-4) || idx + 1000);
+                        const created = new Date(a.createdAt).toLocaleString();
+                        const statusText = a.status === 'accepted' ? 'Accepted' : a.status === 'rejected' ? 'Rejected' : 'Pending';
+                        return (
+                          <tr key={a.id} className="border-b border-slate-100">
+                            <td className="px-3 py-2 font-semibold">{rowId}</td>
+                            <td className="px-3 py-2">{created}</td>
+                            <td className="px-3 py-2">{a.phoneOrEmail || '-'}</td>
+                            <td className="px-3 py-2">{a.name || '-'}</td>
+                            <td className="px-3 py-2">{a.amount || '-'}</td>
+                            <td className="px-3 py-2">{a.date || '-'}</td>
+                            <td className="px-3 py-2">{a.time || '-'}</td>
+                            <td className="px-3 py-2">{a.location || '-'}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`inline-flex rounded px-2 py-1 text-xs font-bold ${
+                                  a.status === 'accepted'
+                                    ? 'bg-green-100 text-green-700'
+                                    : a.status === 'rejected'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                }`}
+                              >
+                                {statusText}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-green-600 px-2 text-xs font-bold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={a.status !== 'pending'}
+                                  onClick={async () => {
+                                    const adminPin = getDb().admin.pin.trim();
+                                    if (!adminPin) return;
+                                    const note = window.prompt('Optional note for customer', '') ?? '';
+                                    setError('');
+                                    try {
+                                      await adminApi.decideAppointment(adminPin, a.id, { status: 'accepted', note });
+                                      await loadAppointments();
+                                    } catch (e) {
+                                      setError(e instanceof Error ? e.message : 'Unable to accept appointment.');
+                                    }
+                                  }}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={a.status !== 'pending'}
+                                  onClick={async () => {
+                                    const adminPin = getDb().admin.pin.trim();
+                                    if (!adminPin) return;
+                                    const note = window.prompt('Optional note for customer', '') ?? '';
+                                    setError('');
+                                    try {
+                                      await adminApi.decideAppointment(adminPin, a.id, { status: 'rejected', note });
+                                      await loadAppointments();
+                                    } catch (e) {
+                                      setError(e instanceof Error ? e.message : 'Unable to reject appointment.');
+                                    }
+                                  }}
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {!appointments.length && (
+                        <tr>
+                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={10}>
+                            No appointments found.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

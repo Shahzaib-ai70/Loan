@@ -843,6 +843,124 @@ app.post('/api/admin/chat/messages/:userId', requireAdmin, (req, res) => {
   res.json({ ok: true, id });
 });
 
+const parseAppointmentMessage = (message) => {
+  const raw = String(message || '').trim();
+  if (!raw.toUpperCase().startsWith('APPOINTMENT REQUEST')) return null;
+  const lines = raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const getVal = (prefix) => {
+    const line = lines.find((l) => l.toLowerCase().startsWith(prefix.toLowerCase()));
+    if (!line) return '';
+    return String(line.slice(prefix.length)).trim();
+  };
+  const amount = getVal('Deposit Amount:');
+  const date = getVal('Date:');
+  const time = getVal('Time:');
+  const location = getVal('Location/Branch:');
+  const note = getVal('Note:');
+  const name = getVal('Name:');
+  const login = getVal('Login:');
+  return { amount, date, time, location, note, name, login };
+};
+
+app.get('/api/admin/appointments', requireAdmin, (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT m.id as id, m.user_id as user_id, m.message as message, m.created_at as created_at, u.phone_or_email as phone_or_email
+       FROM chat_messages m
+       LEFT JOIN users u ON u.id = m.user_id
+       WHERE upper(m.message) LIKE 'APPOINTMENT REQUEST%'
+       ORDER BY m.created_at DESC`,
+    )
+    .all();
+
+  const decisionRows = db
+    .prepare(
+      `SELECT id, user_id, message, created_at
+       FROM chat_messages
+       WHERE upper(message) LIKE 'APPOINTMENT_DECISION|%'
+       ORDER BY created_at DESC`,
+    )
+    .all();
+
+  const decisionByAppointmentId = {};
+  for (const r of decisionRows) {
+    const msg = String(r.message || '');
+    const parts = msg.split('|');
+    const appointmentId = String(parts[1] || '').trim();
+    const status = String(parts[2] || '').trim().toLowerCase();
+    if (!appointmentId) continue;
+    if (decisionByAppointmentId[appointmentId]) continue;
+    if (status !== 'accepted' && status !== 'rejected') continue;
+    decisionByAppointmentId[appointmentId] = { status, decidedAt: r.created_at };
+  }
+
+  const appointments = [];
+  for (const r of rows) {
+    const parsed = parseAppointmentMessage(r.message);
+    if (!parsed) continue;
+    const decision = decisionByAppointmentId[r.id];
+    appointments.push({
+      id: r.id,
+      userId: r.user_id,
+      phoneOrEmail: r.phone_or_email || parsed.login || '',
+      name: parsed.name || '',
+      amount: parsed.amount || '',
+      date: parsed.date || '',
+      time: parsed.time || '',
+      location: parsed.location || '',
+      note: parsed.note || '',
+      createdAt: r.created_at,
+      status: decision?.status || 'pending',
+      decidedAt: decision?.decidedAt || null,
+    });
+  }
+  res.json({ appointments });
+});
+
+app.post('/api/admin/appointments/:appointmentId/decision', requireAdmin, (req, res) => {
+  const { appointmentId } = req.params;
+  const status = String(req.body?.status || '').trim().toLowerCase();
+  const note = String(req.body?.note || '').trim();
+  if (status !== 'accepted' && status !== 'rejected') {
+    res.status(400).json({ message: 'Invalid status.' });
+    return;
+  }
+  const row = db
+    .prepare('SELECT id, user_id, message, created_at FROM chat_messages WHERE id = ? AND upper(message) LIKE \'APPOINTMENT REQUEST%\'')
+    .get(appointmentId);
+  if (!row) {
+    res.status(404).json({ message: 'Appointment not found.' });
+    return;
+  }
+  const parsed = parseAppointmentMessage(row.message) || {};
+  const userId = row.user_id;
+  const friendly = status === 'accepted' ? 'Appointment accepted.' : 'Appointment rejected.';
+  const decisionMessage = [
+    `APPOINTMENT_DECISION|${appointmentId}|${status}`,
+    friendly,
+    parsed.amount ? `Deposit Amount: ${parsed.amount}` : null,
+    parsed.date ? `Date: ${parsed.date}` : null,
+    parsed.time ? `Time: ${parsed.time}` : null,
+    parsed.location ? `Location/Branch: ${parsed.location}` : null,
+    note ? `Note: ${note}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const id = makeId('MSG');
+  db.prepare('INSERT INTO chat_messages (id, user_id, sender, message, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    id,
+    userId,
+    'admin',
+    decisionMessage,
+    now(),
+  );
+  res.json({ ok: true });
+});
+
 app.get('/api/admin/chat/realtime/:userId', requireAdmin, (req, res) => {
   const { userId } = req.params;
   res.setHeader('Content-Type', 'text/event-stream');

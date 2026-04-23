@@ -117,6 +117,27 @@ export type WithdrawResponse = {
   balance: { currentBalance: number; withdrawnAmount: number };
 };
 
+export type AppointmentStatus = 'pending' | 'accepted' | 'rejected';
+
+export type Appointment = {
+  id: string;
+  userId: string;
+  phoneOrEmail: string;
+  name: string;
+  amount: string;
+  date: string;
+  time: string;
+  location: string;
+  note: string;
+  createdAt: number;
+  status: AppointmentStatus;
+  decidedAt: number | null;
+};
+
+export type AdminAppointmentsResponse = {
+  appointments: Appointment[];
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -168,6 +189,14 @@ export const adminApi = {
     request<AdminOverviewResponse>(`/api/admin/overview`, { headers: { 'x-admin-pin': adminPin } }),
   getAgents: (adminPin: string) =>
     request<AdminAgentsResponse>(`/api/admin/agents`, { headers: { 'x-admin-pin': adminPin } }),
+  getAppointments: (adminPin: string) =>
+    request<AdminAppointmentsResponse>(`/api/admin/appointments`, { headers: { 'x-admin-pin': adminPin } }),
+  decideAppointment: (adminPin: string, appointmentId: string, payload: { status: 'accepted' | 'rejected'; note?: string }) =>
+    request<{ ok: boolean }>(`/api/admin/appointments/${encodeURIComponent(appointmentId)}/decision`, {
+      method: 'POST',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify(payload),
+    }),
   createAgent: (adminPin: string, payload: { username: string; password: string; inviteCode: string }) =>
     request<{ agent: AgentSummary }>(`/api/admin/agents`, {
       method: 'POST',
