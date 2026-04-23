@@ -1,9 +1,9 @@
-import { ChevronRight, FileSignature, FileText, Info, LogOut, ScrollText, UserRound } from 'lucide-react';
+import { CalendarClock, ChevronRight, FileSignature, FileText, Info, LogOut, ScrollText, UserRound } from 'lucide-react';
 import { getCurrentUser, getLatestApplicationForUser } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 
 type UserProfileProps = {
-  onNavigate: (to: 'my-information' | 'application-status' | 'loan-contract' | 'terms-and-conditions' | 'auth') => void;
+  onNavigate: (to: 'my-information' | 'application-status' | 'loan-contract' | 'terms-and-conditions' | 'appointment' | 'auth') => void;
   onLogout: () => void;
 };
 
@@ -97,6 +97,16 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
           </div>
           <div className="flex-1">
             <div className="text-sm font-extrabold text-slate-900">{t('profile.terms')}</div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400" />
+        </button>
+
+        <button type="button" className={optionRow} onClick={() => onNavigate('appointment')}>
+          <div className={iconBox}>
+            <CalendarClock className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-extrabold text-slate-900">Appointment</div>
           </div>
           <ChevronRight className="h-5 w-5 text-slate-400" />
         </button>
