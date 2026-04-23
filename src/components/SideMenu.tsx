@@ -5,7 +5,6 @@ import {
   Headset,
   HelpCircle,
   Home,
-  LockKeyhole,
   LogOut,
   MoreHorizontal,
   Newspaper,
@@ -173,25 +172,6 @@ export function SideMenu({ open, onClose, onNavigate, activeKey, showLogout, onL
                   </button>
                 );
               })}
-          </div>
-
-          <div className="px-4 py-6 text-center">
-            <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">{t('register.hotline')}</div>
-            <div className="mt-1 text-lg font-extrabold text-slate-900">+1 773 322 9624</div>
-          </div>
-
-          <div className="px-4 pb-6">
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-[#e21b23] py-3 text-sm font-extrabold text-white hover:bg-[#c9161d]"
-              onClick={() => {
-                onClose();
-                onNavigate('auth');
-              }}
-            >
-              <LockKeyhole className="h-4 w-4" />
-              {t('register.electronicBanking')}
-            </button>
           </div>
         </div>
       </div>

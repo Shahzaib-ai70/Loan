@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
 import { adminApi, applicationsApi, type AgentSummary, type Appointment } from '../lib/api';
+import { useCurrency } from '../lib/currency';
 import {
   type Application,
   type LoanStatus,
@@ -26,7 +27,7 @@ type AdminPanelProps = {
   onOpenEdit: (appId: string) => void;
 };
 
-type Section = 'dashboard' | 'customers' | 'loans' | 'appointments' | 'support' | 'agents';
+type Section = 'dashboard' | 'customers' | 'loans' | 'appointments' | 'support' | 'agents' | 'settings';
 
 const card = 'rounded-sm border border-slate-200 bg-white';
 const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-[#0b4a90]';
@@ -101,13 +102,14 @@ const readFileAsDataUrl = async (file: File): Promise<string> => {
 };
 
 const isSection = (value: string): value is Section =>
-  ['dashboard', 'customers', 'loans', 'appointments', 'support', 'agents'].includes(value);
+  ['dashboard', 'customers', 'loans', 'appointments', 'support', 'agents', 'settings'].includes(value);
 
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState<'password' | 'pin'>('password');
   const [pinLogin, setPinLogin] = useState('');
+  const { showCurrencySign, setShowCurrencySign } = useCurrency();
   const [operatorName, setOperatorName] = useState(() => {
     try {
       return localStorage.getItem(OPERATOR_NAME_KEY) || 'Admin';
@@ -664,6 +666,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             <SidebarItem label="Appointments" count={totalAppointments} active={section === 'appointments'} onClick={() => setSection('appointments')} />
             <SidebarItem label="Support" count={totalSupport} active={section === 'support'} onClick={() => setSection('support')} />
             <SidebarItem label="Agents" count={totalAgents} active={section === 'agents'} onClick={() => setSection('agents')} />
+            <SidebarItem label="Settings" count={0} active={section === 'settings'} onClick={() => setSection('settings')} />
           </nav>
         </aside>
 
@@ -1137,6 +1140,27 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {section === 'settings' && (
+              <div className={`${card} p-4`}>
+                <h2 className="text-4xl font-semibold text-slate-800">Settings</h2>
+                <div className="mt-1 text-sm font-semibold text-slate-500">Currency sign control (customer side).</div>
+
+                <div className="mt-5 max-w-xl space-y-3">
+                  <div className="text-xs font-bold text-slate-700">Show currency sign ($)</div>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                      <input type="radio" name="currencySignAdmin" checked={showCurrencySign} onChange={() => setShowCurrencySign(true)} />
+                      ON
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                      <input type="radio" name="currencySignAdmin" checked={!showCurrencySign} onChange={() => setShowCurrencySign(false)} />
+                      OFF
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
