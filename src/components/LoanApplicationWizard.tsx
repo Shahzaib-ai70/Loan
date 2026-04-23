@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { SignaturePad } from './SignaturePad';
 import { applicationsApi } from '../lib/api';
 import { findApplicationByIdCardNumber, getCurrentUser, upsertApplication } from '../lib/db';
+import { formatMoney, useCurrency } from '../lib/currency';
 
 type LoanApplicationWizardProps = {
   onSubmitted: () => void;
@@ -50,12 +51,10 @@ const pillInput =
 
 const labelClass = 'text-sm font-bold text-slate-700';
 
-const calcMoney = (n: number) =>
-  n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWizardProps) {
   const [step, setStep] = useState<StepId>(1);
   const [error, setError] = useState('');
+  const { showCurrencySign } = useCurrency();
 
   const [state, setState] = useState<FormState>({
     fullName: '',
@@ -527,7 +526,7 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
               />
             </div>
             <div>
-              <div className={labelClass}>Monthly Income($) *</div>
+              <div className={labelClass}>Monthly Income{showCurrencySign ? ' ($)' : ''} *</div>
               <input
                 value={state.monthlyIncome}
                 onChange={(e) => update('monthlyIncome', e.target.value)}
@@ -593,7 +592,7 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
         {step === 5 && (
           <div className="mt-5 space-y-6">
             <div>
-              <div className="text-sm font-extrabold text-slate-900">Loan Amount: ${effectiveAmount.toLocaleString()}</div>
+              <div className="text-sm font-extrabold text-slate-900">Loan Amount: {formatMoney(effectiveAmount, showCurrencySign, 0)}</div>
               <input
                 type="range"
                 min={MIN_LOAN}
@@ -603,8 +602,8 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
                 className="mt-3 w-full"
               />
               <div className="mt-1 flex justify-between text-xs font-semibold text-slate-500">
-                <span>${MIN_LOAN.toLocaleString()}</span>
-                <span>${MAX_LOAN.toLocaleString()}</span>
+                <span>{formatMoney(MIN_LOAN, showCurrencySign, 0)}</span>
+                <span>{formatMoney(MAX_LOAN, showCurrencySign, 0)}</span>
               </div>
             </div>
 
@@ -637,7 +636,7 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
                 className="mt-3 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
               />
               <div className="mt-1 text-xs font-semibold text-slate-500">
-                Allowed range: ${MIN_LOAN.toLocaleString()} - ${MAX_LOAN.toLocaleString()}
+                Allowed range: {formatMoney(MIN_LOAN, showCurrencySign, 0)} - {formatMoney(MAX_LOAN, showCurrencySign, 0)}
               </div>
             </div>
 
@@ -678,15 +677,15 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
             </div>
 
             <div className="rounded-2xl bg-[#0b4a90] p-5 text-white shadow-sm">
-              <div className="text-center text-2xl font-extrabold text-[#ffd000]">${calcMoney(monthlyPayment)}</div>
+              <div className="text-center text-2xl font-extrabold text-[#ffd000]">{formatMoney(monthlyPayment, showCurrencySign, 2)}</div>
               <div className="mt-4 space-y-3 text-sm font-semibold">
                 <div className="flex items-center justify-between border-b border-white/15 pb-2">
                   <span className="text-white/90">Monthly Payment</span>
-                  <span>${calcMoney(monthlyPayment)}</span>
+                  <span>{formatMoney(monthlyPayment, showCurrencySign, 2)}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-white/15 pb-2">
                   <span className="text-white/90">Total Loan Amount</span>
-                  <span>${effectiveAmount.toLocaleString()}</span>
+                  <span>{formatMoney(effectiveAmount, showCurrencySign, 0)}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-white/15 pb-2">
                   <span className="text-white/90">Loan Term</span>
@@ -698,11 +697,11 @@ export function LoanApplicationWizard({ onSubmitted, onBack }: LoanApplicationWi
                 </div>
                 <div className="flex items-center justify-between border-b border-white/15 pb-2">
                   <span className="text-white/90">Total Interest</span>
-                  <span>${calcMoney(loanInterest)}</span>
+                  <span>{formatMoney(loanInterest, showCurrencySign, 2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-white/90">Total Repayment</span>
-                  <span>${calcMoney(totalRepayment)}</span>
+                  <span>{formatMoney(totalRepayment, showCurrencySign, 2)}</span>
                 </div>
               </div>
             </div>

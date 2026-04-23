@@ -1,5 +1,6 @@
 import { ChevronLeft } from 'lucide-react';
 import { getCurrentUser, getLatestApplicationForUser } from '../lib/db';
+import { useCurrency } from '../lib/currency';
 
 type MyInformationContactProps = {
   onBack: () => void;
@@ -11,6 +12,7 @@ const pillInput =
 const labelClass = 'text-sm font-bold text-slate-700';
 
 export function MyInformationContact({ onBack }: MyInformationContactProps) {
+  const { showCurrencySign } = useCurrency();
   const user = getCurrentUser();
   const app = user ? getLatestApplicationForUser(user.id) : null;
 
@@ -79,7 +81,7 @@ export function MyInformationContact({ onBack }: MyInformationContactProps) {
           </div>
 
           <div>
-            <div className={labelClass}>Monthly Income($) *</div>
+            <div className={labelClass}>Monthly Income{showCurrencySign ? ' ($)' : ''} *</div>
             <input value={app.contact.monthlyIncome} readOnly className={pillInput} />
           </div>
         </div>

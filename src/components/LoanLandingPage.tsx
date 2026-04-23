@@ -14,6 +14,7 @@ import heroImage from '../assets/hero-image.jpg';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { useI18n } from '../lib/i18n';
+import { formatCompactMoney, useCurrency } from '../lib/currency';
 
 interface LoanLandingPageProps {
   onNavigate: (
@@ -41,6 +42,7 @@ type Slide = {
 
 export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
   const { t } = useI18n();
+  const { showCurrencySign } = useCurrency();
   const slides = useMemo<Slide[]>(
     () => [
       {
@@ -243,7 +245,9 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                 </div>
                 <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                   <div className="text-xs font-semibold text-slate-500">{t('home.personalLoan.amountLabel')}</div>
-                  <div className="mt-1 text-lg font-extrabold text-slate-900">{t('home.personalLoan.amountValue')}</div>
+                  <div className="mt-1 text-lg font-extrabold text-slate-900">
+                    {t('home.personalLoan.amountValue', { amount: formatCompactMoney(100000, showCurrencySign) })}
+                  </div>
                 </div>
               </div>
             </div>

@@ -19,6 +19,7 @@ import { MyInformationSignature } from './components/MyInformationSignature';
 import { LoanContract } from './components/LoanContract';
 import { TermsAndConditionsPage } from './components/TermsAndConditionsPage';
 import { AppointmentPage } from './components/AppointmentPage';
+import { CurrencySettingsPage } from './components/CurrencySettingsPage';
 import { LiveChat } from './components/LiveChat';
 import { OffersPage } from './components/OffersPage';
 import { ExchangeRatesPage } from './components/ExchangeRatesPage';
@@ -58,6 +59,7 @@ export type View =
   | 'loan-contract'
   | 'terms-and-conditions'
   | 'appointment'
+  | 'currency-settings'
   | 'offers'
   | 'exchange-rates'
   | 'deposit-rates'
@@ -103,6 +105,7 @@ const isView = (value: string): value is View =>
     'loan-contract',
     'terms-and-conditions',
     'appointment',
+    'currency-settings',
     'offers',
     'exchange-rates',
     'deposit-rates',
@@ -491,6 +494,12 @@ function App() {
       {currentView === 'appointment' && (
         <div className="bg-gray-50 min-h-[calc(100vh-80px)]">
           <AppointmentPage onBack={() => navigate('profile')} />
+        </div>
+      )}
+
+      {currentView === 'currency-settings' && (
+        <div className="bg-gray-50 min-h-[calc(100vh-80px)]">
+          <CurrencySettingsPage onBack={() => navigate('profile')} />
         </div>
       )}
 

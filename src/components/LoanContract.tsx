@@ -2,12 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeft, Printer } from 'lucide-react';
 import { usersApi } from '../lib/api';
 import { getCurrentUser, getLatestApplicationForUser, getUserBalance, setUserBalance } from '../lib/db';
+import { formatMoney, useCurrency } from '../lib/currency';
 
 type LoanContractProps = {
   onBack: () => void;
 };
-
-const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtDateTime = (ms: number) => {
   const d = new Date(ms);
@@ -34,6 +33,7 @@ function KV({ k, v }: { k: string; v: string }) {
 }
 
 export function LoanContract({ onBack }: LoanContractProps) {
+  const { showCurrencySign } = useCurrency();
   const user = getCurrentUser();
   const app = user ? getLatestApplicationForUser(user.id) : null;
 
@@ -135,12 +135,12 @@ export function LoanContract({ onBack }: LoanContractProps) {
 
           <Section title="Article I: Loan Terms">
             <div>
-              <KV k="Loan amount" v={`$${money(app.loan.amount)}`} />
+              <KV k="Loan amount" v={formatMoney(app.loan.amount, showCurrencySign, 2)} />
               <KV k="Loan term" v={`${app.loan.termMonths} months`} />
               <KV k="Interest rate" v={`${app.loan.interestRate}%`} />
-              <KV k="Monthly payment" v={`$${money(app.loan.monthlyPayment)}`} />
-              <KV k="Total interest" v={`$${money(app.loan.totalInterest)}`} />
-              <KV k="Total repayment" v={`$${money(app.loan.totalRepayment)}`} />
+              <KV k="Monthly payment" v={formatMoney(app.loan.monthlyPayment, showCurrencySign, 2)} />
+              <KV k="Total interest" v={formatMoney(app.loan.totalInterest, showCurrencySign, 2)} />
+              <KV k="Total repayment" v={formatMoney(app.loan.totalRepayment, showCurrencySign, 2)} />
               <KV k="Loan status" v={app.status.replace('_', ' ').toUpperCase()} />
             </div>
           </Section>
@@ -157,8 +157,8 @@ export function LoanContract({ onBack }: LoanContractProps) {
             <div>
               <KV k="Application submitted" v={fmtDateTime(app.submittedAt)} />
               <KV k="Approved at" v={app.approvedAt ? fmtDateTime(app.approvedAt) : '-'} />
-              <KV k="Current balance" v={`$${money(balance.currentBalance)}`} />
-              <KV k="Withdrawn amount" v={`$${money(balance.withdrawnAmount)}`} />
+              <KV k="Current balance" v={formatMoney(balance.currentBalance, showCurrencySign, 2)} />
+              <KV k="Withdrawn amount" v={formatMoney(balance.withdrawnAmount, showCurrencySign, 2)} />
             </div>
           </Section>
 
