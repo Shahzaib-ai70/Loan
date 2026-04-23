@@ -32,8 +32,15 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleCurrencySign = useCallback(() => {
-    setShowCurrencySign((v) => !v);
-  }, [setShowCurrencySign]);
+    setShowCurrencySignState((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(CURRENCY_SIGN_KEY, next ? '1' : '0');
+      } catch {
+      }
+      return next;
+    });
+  }, []);
 
   const value = useMemo<CurrencyContextValue>(
     () => ({ showCurrencySign, setShowCurrencySign, toggleCurrencySign }),
