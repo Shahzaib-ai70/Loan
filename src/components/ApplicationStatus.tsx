@@ -74,7 +74,7 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded-xl bg-[#f8fbff] p-4 ring-1 ring-slate-200">
             <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">Submitted</div>
             <div className="mt-1 text-sm font-semibold text-slate-900">{submittedDate}</div>
@@ -84,10 +84,6 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
             <div className="mt-1 text-sm font-semibold text-slate-900">
               {application.loan ? formatMoney(application.loan.amount, showCurrencySign, 0, currencySymbol) : '-'}
             </div>
-          </div>
-          <div className="rounded-xl bg-[#f8fbff] p-4 ring-1 ring-slate-200">
-            <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">Applicant</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{application.applicant?.fullName ?? '-'}</div>
           </div>
         </div>
 
@@ -126,34 +122,6 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
             </div>
           </div>
         )}
-
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-sm font-extrabold text-slate-900">Applicant Details</div>
-            <div className="mt-2 space-y-1 text-sm text-slate-600">
-              <div>Full Name: <span className="font-semibold text-slate-900">{application.applicant.fullName}</span></div>
-              <div>ID Card: <span className="font-semibold text-slate-900">{application.applicant.idCardNumber}</span></div>
-              <div>Current Job: <span className="font-semibold text-slate-900">{application.contact.currentJob}</span></div>
-              <div>Current Address: <span className="font-semibold text-slate-900">{application.contact.currentAddress}</span></div>
-              <div>Bank: <span className="font-semibold text-slate-900">{application.bank.bankName}</span></div>
-            </div>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-sm font-extrabold text-slate-900">Documents & Signature</div>
-            <div className="mt-2 space-y-1 text-sm text-slate-600">
-              <div>Front ID: <span className="font-semibold text-slate-900">{application.documents.idFrontName || '-'}</span></div>
-              <div>Back ID: <span className="font-semibold text-slate-900">{application.documents.idBackName || '-'}</span></div>
-              <div>Selfie: <span className="font-semibold text-slate-900">{application.documents.selfieHoldingIdName || '-'}</span></div>
-            </div>
-            {application.documents.signatureDataUrl && (
-              <img
-                src={application.documents.signatureDataUrl}
-                alt="Signature"
-                className="mt-3 h-24 w-full rounded border object-contain bg-slate-50"
-              />
-            )}
-          </div>
-        </div>
 
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex items-center gap-2">
