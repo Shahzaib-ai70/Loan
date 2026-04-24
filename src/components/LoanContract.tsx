@@ -102,7 +102,7 @@ export function LoanContract({ onBack }: LoanContractProps) {
       <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="bg-[#0b4a90] px-6 py-8 text-center text-white">
           <div className="text-3xl font-extrabold tracking-wide">LOAN AGREEMENT</div>
-          <div className="mt-1 text-xs font-semibold text-white/85">VB LOAN BANK • LEGALLY BINDING CONTRACT</div>
+          <div className="mt-1 text-xs font-semibold text-white/85">ACCREDITED • LEGALLY BINDING CONTRACT</div>
           <div className="mx-auto mt-5 max-w-[520px] rounded-2xl bg-white/10 px-4 py-3 text-sm font-extrabold">
             CONTRACT NO: {contractNo}
           </div>
@@ -116,7 +116,7 @@ export function LoanContract({ onBack }: LoanContractProps) {
                 <span className="font-extrabold">{fmtDateTime(app.submittedAt)}</span>, by and between:
               </div>
               <div className="mt-3">
-                <div className="font-extrabold text-slate-900">VB LOAN BANK</div>
+                <div className="font-extrabold text-slate-900">ACCREDITED</div>
                 <div className="text-slate-700">
                   a duly organized banking institution existing under the laws of the United States, with its principal office located at 250 Nicollet Mall, Suite 720 Minneapolis, MN 55401, USA
                 </div>

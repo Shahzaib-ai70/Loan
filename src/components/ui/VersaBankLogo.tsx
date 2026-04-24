@@ -30,8 +30,8 @@ export function VersaBankLogo({ variant = 'compact', className = '', iconSize = 
 
       <div className={textClassName}>
         <div className="leading-none">
-          <span className="text-[22px] font-semibold text-white">Versa</span>
-          <span className="text-[22px] font-extrabold text-white">Bank</span>
+          <span className="text-[22px] font-semibold text-white">Accred</span>
+          <span className="text-[22px] font-extrabold text-white">ited</span>
         </div>
         {variant === 'full' && (
           <div className="mt-1 text-[11px] font-semibold text-white/70">Choice Through Innovation</div>
@@ -40,4 +40,3 @@ export function VersaBankLogo({ variant = 'compact', className = '', iconSize = 
     </div>
   );
 }
-

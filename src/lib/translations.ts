@@ -177,7 +177,7 @@ export const TRANSLATIONS: Record<Language, TranslationDict> = {
     'home.footer.followUs': 'Follow Us',
     'home.footer.secureBanking': 'Secure Banking',
     'home.footer.secureBankingBody': 'Your data is protected with modern security standards.',
-    'home.footer.copyright': '© Copyright VersaBank',
+    'home.footer.copyright': '© Copyright Accredited',
   },
   fr: {
     'common.back': 'Retour',
@@ -345,7 +345,7 @@ export const TRANSLATIONS: Record<Language, TranslationDict> = {
     'home.footer.followUs': 'Suivez-nous',
     'home.footer.secureBanking': 'Banque sécurisée',
     'home.footer.secureBankingBody': 'Vos données sont protégées par des normes de sécurité modernes.',
-    'home.footer.copyright': '© Copyright VersaBank',
+    'home.footer.copyright': '© Copyright Accredited',
   },
   es: {
     'common.back': 'Atrás',
@@ -513,7 +513,7 @@ export const TRANSLATIONS: Record<Language, TranslationDict> = {
     'home.footer.followUs': 'Síguenos',
     'home.footer.secureBanking': 'Banca segura',
     'home.footer.secureBankingBody': 'Tus datos están protegidos con estándares modernos de seguridad.',
-    'home.footer.copyright': '© Copyright VersaBank',
+    'home.footer.copyright': '© Copyright Accredited',
   },
   'pt-BR': {
     'common.back': 'Voltar',
@@ -681,7 +681,7 @@ export const TRANSLATIONS: Record<Language, TranslationDict> = {
     'home.footer.followUs': 'Siga-nos',
     'home.footer.secureBanking': 'Banco seguro',
     'home.footer.secureBankingBody': 'Seus dados são protegidos com padrões modernos de segurança.',
-    'home.footer.copyright': '© Copyright VersaBank',
+    'home.footer.copyright': '© Copyright Accredited',
   },
   de: {
     'common.back': 'Zurück',
@@ -849,6 +849,6 @@ export const TRANSLATIONS: Record<Language, TranslationDict> = {
     'home.footer.followUs': 'Folgen Sie uns',
     'home.footer.secureBanking': 'Sicheres Banking',
     'home.footer.secureBankingBody': 'Ihre Daten sind mit modernen Sicherheitsstandards geschützt.',
-    'home.footer.copyright': '© Copyright VersaBank',
+    'home.footer.copyright': '© Copyright Accredited',
   },
 };
