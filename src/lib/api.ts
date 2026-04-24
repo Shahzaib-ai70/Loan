@@ -38,6 +38,11 @@ export type SupportSettings = {
   helpline: string;
 };
 
+export type AppSettings = {
+  currencySignEnabled: boolean;
+  currencySymbol: string;
+};
+
 export type AdminLoginResponse = {
   ok: boolean;
   adminPin: string;
@@ -138,6 +143,15 @@ export type AdminAppointmentsResponse = {
   appointments: Appointment[];
 };
 
+export type PublicSettingsResponse = {
+  settings: AppSettings;
+};
+
+export type AdminUpdateAppSettingsResponse = {
+  ok: boolean;
+  settings: AppSettings;
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -180,6 +194,10 @@ export const chatApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ message }),
     }),
+};
+
+export const publicApi = {
+  getSettings: () => request<PublicSettingsResponse>(`/api/public/settings`),
 };
 
 export const adminApi = {
@@ -225,6 +243,12 @@ export const adminApi = {
     request<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
       headers: { 'x-admin-pin': adminPin },
+    }),
+  updateAppSettings: (adminPin: string, payload: { currencySignEnabled: boolean; currencySymbol: string }) =>
+    request<AdminUpdateAppSettingsResponse>(`/api/admin/app/settings`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify(payload),
     }),
 };
 

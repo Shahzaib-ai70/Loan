@@ -83,6 +83,14 @@ export const initDb = () => {
   if (!colNames.has('username')) db.exec('ALTER TABLE admin_settings ADD COLUMN username TEXT');
   if (!colNames.has('password_salt')) db.exec('ALTER TABLE admin_settings ADD COLUMN password_salt TEXT');
   if (!colNames.has('password_hash')) db.exec('ALTER TABLE admin_settings ADD COLUMN password_hash TEXT');
+  if (!colNames.has('currency_sign_enabled')) {
+    db.exec('ALTER TABLE admin_settings ADD COLUMN currency_sign_enabled INTEGER');
+    db.exec('UPDATE admin_settings SET currency_sign_enabled = 1 WHERE currency_sign_enabled IS NULL');
+  }
+  if (!colNames.has('currency_symbol')) {
+    db.exec('ALTER TABLE admin_settings ADD COLUMN currency_symbol TEXT');
+    db.exec("UPDATE admin_settings SET currency_symbol = '$' WHERE currency_symbol IS NULL OR currency_symbol = ''");
+  }
 
   const userCols = db.prepare('PRAGMA table_info(users)').all();
   const userColNames = new Set(userCols.map((c) => c.name));

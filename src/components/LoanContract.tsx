@@ -33,7 +33,7 @@ function KV({ k, v }: { k: string; v: string }) {
 }
 
 export function LoanContract({ onBack }: LoanContractProps) {
-  const { showCurrencySign } = useCurrency();
+  const { showCurrencySign, currencySymbol } = useCurrency();
   const user = getCurrentUser();
   const app = user ? getLatestApplicationForUser(user.id) : null;
 
@@ -135,12 +135,12 @@ export function LoanContract({ onBack }: LoanContractProps) {
 
           <Section title="Article I: Loan Terms">
             <div>
-              <KV k="Loan amount" v={formatMoney(app.loan.amount, showCurrencySign, 2)} />
+              <KV k="Loan amount" v={formatMoney(app.loan.amount, showCurrencySign, 2, currencySymbol)} />
               <KV k="Loan term" v={`${app.loan.termMonths} months`} />
               <KV k="Interest rate" v={`${app.loan.interestRate}%`} />
-              <KV k="Monthly payment" v={formatMoney(app.loan.monthlyPayment, showCurrencySign, 2)} />
-              <KV k="Total interest" v={formatMoney(app.loan.totalInterest, showCurrencySign, 2)} />
-              <KV k="Total repayment" v={formatMoney(app.loan.totalRepayment, showCurrencySign, 2)} />
+              <KV k="Monthly payment" v={formatMoney(app.loan.monthlyPayment, showCurrencySign, 2, currencySymbol)} />
+              <KV k="Total interest" v={formatMoney(app.loan.totalInterest, showCurrencySign, 2, currencySymbol)} />
+              <KV k="Total repayment" v={formatMoney(app.loan.totalRepayment, showCurrencySign, 2, currencySymbol)} />
               <KV k="Loan status" v={app.status.replace('_', ' ').toUpperCase()} />
             </div>
           </Section>
@@ -157,8 +157,8 @@ export function LoanContract({ onBack }: LoanContractProps) {
             <div>
               <KV k="Application submitted" v={fmtDateTime(app.submittedAt)} />
               <KV k="Approved at" v={app.approvedAt ? fmtDateTime(app.approvedAt) : '-'} />
-              <KV k="Current balance" v={formatMoney(balance.currentBalance, showCurrencySign, 2)} />
-              <KV k="Withdrawn amount" v={formatMoney(balance.withdrawnAmount, showCurrencySign, 2)} />
+              <KV k="Current balance" v={formatMoney(balance.currentBalance, showCurrencySign, 2, currencySymbol)} />
+              <KV k="Withdrawn amount" v={formatMoney(balance.withdrawnAmount, showCurrencySign, 2, currencySymbol)} />
             </div>
           </Section>
 

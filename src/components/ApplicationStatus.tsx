@@ -11,7 +11,7 @@ type ApplicationStatusProps = {
 
 export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const { showCurrencySign } = useCurrency();
+  const { showCurrencySign, currencySymbol } = useCurrency();
   const application = useMemo(() => {
     const user = getCurrentUser();
     if (!user) return null;
@@ -82,7 +82,7 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
           <div className="rounded-xl bg-[#f8fbff] p-4 ring-1 ring-slate-200">
             <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">Loan Amount</div>
             <div className="mt-1 text-sm font-semibold text-slate-900">
-              {application.loan ? formatMoney(application.loan.amount, showCurrencySign, 0) : '-'}
+              {application.loan ? formatMoney(application.loan.amount, showCurrencySign, 0, currencySymbol) : '-'}
             </div>
           </div>
           <div className="rounded-xl bg-[#f8fbff] p-4 ring-1 ring-slate-200">
@@ -94,18 +94,18 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
         {application.loan && (
           <div className="mt-6 rounded-2xl bg-[#0b4a90] p-6 text-white shadow-sm">
             <div className="text-center text-3xl font-extrabold text-[#ffd000]">
-              {formatMoney(application.loan.monthlyPayment, showCurrencySign, 2)}
+              {formatMoney(application.loan.monthlyPayment, showCurrencySign, 2, currencySymbol)}
             </div>
             <div className="mt-2 text-center text-sm font-semibold text-white/80">Monthly Payment</div>
 
             <div className="mt-6 space-y-3 text-sm font-semibold">
               <div className="flex items-center justify-between border-b border-white/15 pb-2">
                 <span className="text-white/90">Monthly Payment</span>
-                <span>{formatMoney(application.loan.monthlyPayment, showCurrencySign, 2)}</span>
+                <span>{formatMoney(application.loan.monthlyPayment, showCurrencySign, 2, currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between border-b border-white/15 pb-2">
                 <span className="text-white/90">Total Loan Amount</span>
-                <span>{formatMoney(application.loan.amount, showCurrencySign, 0)}</span>
+                <span>{formatMoney(application.loan.amount, showCurrencySign, 0, currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between border-b border-white/15 pb-2">
                 <span className="text-white/90">Loan Term</span>
@@ -117,11 +117,11 @@ export function ApplicationStatus({ onStartNew }: ApplicationStatusProps) {
               </div>
               <div className="flex items-center justify-between border-b border-white/15 pb-2">
                 <span className="text-white/90">Total Interest</span>
-                <span>{formatMoney(application.loan.totalInterest, showCurrencySign, 2)}</span>
+                <span>{formatMoney(application.loan.totalInterest, showCurrencySign, 2, currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-white/90">Total Repayment</span>
-                <span>{formatMoney(application.loan.totalRepayment, showCurrencySign, 2)}</span>
+                <span>{formatMoney(application.loan.totalRepayment, showCurrencySign, 2, currencySymbol)}</span>
               </div>
             </div>
           </div>

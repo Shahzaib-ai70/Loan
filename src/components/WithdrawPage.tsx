@@ -12,7 +12,7 @@ type WithdrawPageProps = {
 
 export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const { showCurrencySign } = useCurrency();
+  const { showCurrencySign, currencySymbol } = useCurrency();
   const user = getCurrentUser();
   const app = useMemo(() => (user ? getLatestApplicationForUser(user.id) : null), [refreshKey, user?.id]);
   const balance = useMemo(
@@ -157,9 +157,9 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
 
       <div className="rounded-2xl bg-[#0b4a90] p-6 text-white shadow-sm">
         <div className="text-center text-sm font-extrabold text-white/90">Current Balance</div>
-        <div className="mt-2 text-center text-4xl font-extrabold">{formatMoney(snapshot.currentBalance, showCurrencySign, 2)}</div>
+        <div className="mt-2 text-center text-4xl font-extrabold">{formatMoney(snapshot.currentBalance, showCurrencySign, 2, currencySymbol)}</div>
         <div className="mt-4 text-center text-sm font-extrabold text-[#ffd000]">Withdrawn Amount</div>
-        <div className="mt-2 text-center text-3xl font-extrabold">{formatMoney(snapshot.withdrawnAmount, showCurrencySign, 2)}</div>
+        <div className="mt-2 text-center text-3xl font-extrabold">{formatMoney(snapshot.withdrawnAmount, showCurrencySign, 2, currencySymbol)}</div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -227,7 +227,7 @@ export function WithdrawPage({ onNavigate }: WithdrawPageProps) {
             <ShieldCheck className="h-6 w-6 text-green-700" />
           </div>
           <div className="text-sm font-semibold text-slate-700">Your loan approved.</div>
-          <div className="text-2xl font-extrabold text-[#0b4a90]">{formatMoney(withdrawnNow, showCurrencySign, 2)}</div>
+          <div className="text-2xl font-extrabold text-[#0b4a90]">{formatMoney(withdrawnNow, showCurrencySign, 2, currencySymbol)}</div>
           <Button
             type="button"
             className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]"

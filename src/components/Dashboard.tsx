@@ -22,7 +22,7 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [activeTab, setActiveTab] = useState('INSURANCE');
-  const { showCurrencySign } = useCurrency();
+  const { showCurrencySign, currencySymbol } = useCurrency();
 
   const tabs = [
     'INSURANCE', 'CREDIT CARDS', 'MORTGAGES', 'PERSONAL LOANS', 
@@ -448,7 +448,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <CheckCircle2 className="w-4 h-4 text-[#008060]" /> Rates from 6.99% APR
                 </li>
                 <li className="flex items-center gap-2 text-sm text-gray-600">
-                  <CheckCircle2 className="w-4 h-4 text-[#008060]" /> Loan amounts up to {formatCompactMoney(100000, showCurrencySign)}
+                  <CheckCircle2 className="w-4 h-4 text-[#008060]" /> Loan amounts up to {formatCompactMoney(100000, showCurrencySign, currencySymbol)}
                 </li>
                 <li className="flex items-center gap-2 text-sm text-gray-600">
                   <CheckCircle2 className="w-4 h-4 text-[#008060]" /> No prepayment penalties
@@ -548,10 +548,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   </div>
                   <div className="mb-2">
                     <span className="text-sm text-gray-500">Current Balance</span>
-                    <div className="text-3xl font-bold text-gray-900">{formatMoney(24500, showCurrencySign, 2)}</div>
+                    <div className="text-3xl font-bold text-gray-900">{formatMoney(24500, showCurrencySign, 2, currencySymbol)}</div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-[#008060] font-medium mb-6">
-                    <TrendingUp className="w-4 h-4" /> +{formatMoney(145.2, showCurrencySign, 2)} this month
+                    <TrendingUp className="w-4 h-4" /> +{formatMoney(145.2, showCurrencySign, 2, currencySymbol)} this month
                   </div>
                   <div className="space-y-2">
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">

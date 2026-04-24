@@ -109,7 +109,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState<'password' | 'pin'>('password');
   const [pinLogin, setPinLogin] = useState('');
-  const { showCurrencySign, setShowCurrencySign } = useCurrency();
+  const { showCurrencySign, currencySymbol, setShowCurrencySign, setCurrencySymbol } = useCurrency();
   const [operatorName, setOperatorName] = useState(() => {
     try {
       return localStorage.getItem(OPERATOR_NAME_KEY) || 'Admin';
@@ -196,6 +196,42 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     });
     return result.slice(0, perPage);
   }, [dbSnapshot.users, latestAppsPerUser, perPage, usernameFilter]);
+
+  const currencyOptions = useMemo(
+    () => [
+      { label: 'USD ($)', value: '$' },
+      { label: 'EUR (€)', value: '€' },
+      { label: 'GBP (£)', value: '£' },
+      { label: 'JPY (¥)', value: '¥' },
+      { label: 'CNY (¥)', value: '¥' },
+      { label: 'INR (₹)', value: '₹' },
+      { label: 'KRW (₩)', value: '₩' },
+      { label: 'RUB (₽)', value: '₽' },
+      { label: 'TRY (₺)', value: '₺' },
+      { label: 'ILS (₪)', value: '₪' },
+      { label: 'THB (฿)', value: '฿' },
+      { label: 'PHP (₱)', value: '₱' },
+      { label: 'NGN (₦)', value: '₦' },
+      { label: 'VND (₫)', value: '₫' },
+    ],
+    [],
+  );
+
+  const saveAppSettings = async (nextEnabled: boolean, nextSymbol: string) => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) {
+      setError('Admin session expired. Please logout and login again.');
+      return;
+    }
+    setError('');
+    try {
+      const res = await adminApi.updateAppSettings(adminPin, { currencySignEnabled: nextEnabled, currencySymbol: nextSymbol });
+      setShowCurrencySign(!!res.settings.currencySignEnabled);
+      setCurrencySymbol(res.settings.currencySymbol);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update settings.');
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     const normalized = usernameFilter.trim().toLowerCase();
@@ -1153,13 +1189,48 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   <div className="text-xs font-bold text-slate-700">Show currency sign ($)</div>
                   <div className="flex flex-wrap gap-4">
                     <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
-                      <input type="radio" name="currencySignAdmin" checked={showCurrencySign} onChange={() => setShowCurrencySign(true)} />
+                      <input
+                        type="radio"
+                        name="currencySignAdmin"
+                        checked={showCurrencySign}
+                        onChange={() => {
+                          setShowCurrencySign(true);
+                          saveAppSettings(true, currencySymbol);
+                        }}
+                      />
                       ON
                     </label>
                     <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
-                      <input type="radio" name="currencySignAdmin" checked={!showCurrencySign} onChange={() => setShowCurrencySign(false)} />
+                      <input
+                        type="radio"
+                        name="currencySignAdmin"
+                        checked={!showCurrencySign}
+                        onChange={() => {
+                          setShowCurrencySign(false);
+                          saveAppSettings(false, currencySymbol);
+                        }}
+                      />
                       OFF
                     </label>
+                  </div>
+
+                  <div className="pt-2">
+                    <div className="mb-1 text-xs font-bold text-slate-700">Currency symbol</div>
+                    <select
+                      className={field}
+                      value={currencySymbol}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setCurrencySymbol(next);
+                        saveAppSettings(showCurrencySign, next);
+                      }}
+                    >
+                      {currencyOptions.map((o) => (
+                        <option key={o.label} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

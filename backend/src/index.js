@@ -29,6 +29,13 @@ const getAdminCredentials = () => {
   };
 };
 
+const getAppSettings = () => {
+  const row = db.prepare('SELECT currency_sign_enabled, currency_symbol FROM admin_settings WHERE id = 1').get();
+  const enabled = row?.currency_sign_enabled === 0 ? false : true;
+  const symbol = String(row?.currency_symbol || '$').trim() || '$';
+  return { currencySignEnabled: enabled, currencySymbol: symbol };
+};
+
 const verifyAdminPassword = (username, password) => {
   const creds = getAdminCredentials();
   if (!creds.passwordSalt || !creds.passwordHash) return false;
@@ -795,6 +802,12 @@ app.get('/api/support/settings', (_req, res) => {
   });
 });
 
+app.get('/api/public/settings', (_req, res) => {
+  res.json({
+    settings: getAppSettings(),
+  });
+});
+
 app.get('/api/admin/support/settings', requireAdmin, (_req, res) => {
   const row = db
     .prepare('SELECT whatsapp_link, telegram_link, support_email, helpline FROM support_settings WHERE id = 1')
@@ -815,6 +828,14 @@ app.put('/api/admin/support/settings', requireAdmin, (req, res) => {
     'UPDATE support_settings SET whatsapp_link = ?, telegram_link = ?, support_email = ?, helpline = ? WHERE id = 1',
   ).run(String(whatsappLink), String(telegramLink), String(supportEmail), String(helpline));
   res.json({ ok: true });
+});
+
+app.put('/api/admin/app/settings', requireAdmin, (req, res) => {
+  const { currencySignEnabled, currencySymbol } = req.body || {};
+  const enabled = currencySignEnabled === false ? 0 : 1;
+  const symbol = String(currencySymbol || '$').trim().slice(0, 4);
+  db.prepare('UPDATE admin_settings SET currency_sign_enabled = ?, currency_symbol = ? WHERE id = 1').run(enabled, symbol || '$');
+  res.json({ ok: true, settings: getAppSettings() });
 });
 
 app.post('/api/admin/chat/messages/:userId', requireAdmin, (req, res) => {
