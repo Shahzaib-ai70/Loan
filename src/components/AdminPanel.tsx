@@ -4,7 +4,7 @@ import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
 import { adminApi, applicationsApi, type AgentSummary, type Appointment } from '../lib/api';
-import { useCurrency } from '../lib/currency';
+import { formatMoney, useCurrency } from '../lib/currency';
 import {
   type Application,
   type LoanStatus,
@@ -252,6 +252,22 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (!normalized) return agents;
     return agents.filter((a) => `${a.username} ${a.inviteCode}`.toLowerCase().includes(normalized));
   }, [agentSearch, agents]);
+
+  const editLoanPreview = useMemo(() => {
+    if (!editLoanAppId) return null;
+    const app = dbSnapshot.applications[editLoanAppId];
+    if (!app) return null;
+    const amount = Number(String(editLoanAmount).replace(/[^\d.]/g, ''));
+    const termMonths = Number(editLoanTermMonths) || 0;
+    const interestRate = Number(app.loan.interestRate) || 0;
+    if (!Number.isFinite(amount) || amount <= 0 || !termMonths) {
+      return { interestRate, totalInterest: 0, totalRepayment: 0, monthlyPayment: 0 };
+    }
+    const totalInterest = amount * (interestRate / 100);
+    const totalRepayment = amount + totalInterest;
+    const monthlyPayment = totalRepayment / termMonths;
+    return { interestRate, totalInterest, totalRepayment, monthlyPayment };
+  }, [dbSnapshot.applications, editLoanAmount, editLoanAppId, editLoanTermMonths]);
 
   const agentNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1512,7 +1528,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       <Modal open={!!editLoanAppId} title="Edit Loan" onClose={() => setEditLoanAppId(null)}>
         <div className="space-y-4">
           <div>
-            <div className="mb-1 text-xs font-bold text-slate-700">Loan Amount ($)</div>
+            <div className="mb-1 text-xs font-bold text-slate-700">Loan Amount{showCurrencySign ? ` (${currencySymbol})` : ''}</div>
             <input
               value={editLoanAmount}
               onChange={(e) => setEditLoanAmount(e.target.value)}
@@ -1532,6 +1548,26 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               ))}
             </select>
           </div>
+          {editLoanPreview && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-600">Loan %:</span>
+                <span className="font-extrabold text-slate-900">{editLoanPreview.interestRate}%</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Monthly payment:</span>
+                <span className="font-extrabold text-[#0b4a90]">{formatMoney(editLoanPreview.monthlyPayment, showCurrencySign, 2, currencySymbol)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Total interest:</span>
+                <span className="font-extrabold text-slate-900">{formatMoney(editLoanPreview.totalInterest, showCurrencySign, 2, currencySymbol)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Total repayment:</span>
+                <span className="font-extrabold text-slate-900">{formatMoney(editLoanPreview.totalRepayment, showCurrencySign, 2, currencySymbol)}</span>
+              </div>
+            </div>
+          )}
           <Button className="h-11 w-full rounded bg-blue-600 text-sm font-extrabold text-white hover:bg-blue-700" onClick={saveEditLoan}>
             Submit
           </Button>
