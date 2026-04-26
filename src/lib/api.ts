@@ -205,6 +205,10 @@ export const adminApi = {
     request<AdminLoginResponse>(`/api/admin/login`, { method: 'POST', body: JSON.stringify(params) }),
   getOverview: (adminPin: string) =>
     request<AdminOverviewResponse>(`/api/admin/overview`, { headers: { 'x-admin-pin': adminPin } }),
+  getApplication: (adminPin: string, appId: string) =>
+    request<{ application: unknown }>(`/api/admin/applications/${encodeURIComponent(appId)}`, {
+      headers: { 'x-admin-pin': adminPin },
+    }),
   getAgents: (adminPin: string) =>
     request<AdminAgentsResponse>(`/api/admin/agents`, { headers: { 'x-admin-pin': adminPin } }),
   getAppointments: (adminPin: string) =>

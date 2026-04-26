@@ -350,8 +350,30 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       'SELECT id, gender, phone_or_email, created_at, last_application_id, agent_id, invite_code, disabled_login FROM users ORDER BY created_at DESC',
     )
     .all();
-  const applicationsRows = db.prepare('SELECT payload_json FROM applications ORDER BY submitted_at DESC').all();
-  const applications = applicationsRows.map((r) => JSON.parse(r.payload_json));
+  const applicationsRows = db
+    .prepare('SELECT user_id, payload_json, submitted_at FROM applications ORDER BY submitted_at DESC')
+    .all();
+  const seen = new Set();
+  const applications = [];
+  for (const row of applicationsRows) {
+    const userId = row.user_id;
+    if (!userId) continue;
+    if (seen.has(userId)) continue;
+    seen.add(userId);
+    try {
+      const app = JSON.parse(row.payload_json);
+      if (app && app.documents) {
+        const docs = { ...app.documents };
+        delete docs.idFrontDataUrl;
+        delete docs.idBackDataUrl;
+        delete docs.selfieHoldingIdDataUrl;
+        docs.signatureDataUrl = '';
+        app.documents = docs;
+      }
+      applications.push(app);
+    } catch {
+    }
+  }
   const balancesRows = db.prepare('SELECT user_id, current_balance, withdrawn_amount FROM balances').all();
   const balances = Object.fromEntries(
     balancesRows.map((b) => [
@@ -373,6 +395,25 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
     applications,
     balances,
   });
+});
+
+app.get('/api/admin/applications/:appId', requireAdmin, (req, res) => {
+  const appId = String(req.params.appId || '').trim();
+  if (!appId) {
+    res.status(400).json({ message: 'appId is required.' });
+    return;
+  }
+  const row = db.prepare('SELECT payload_json FROM applications WHERE id = ?').get(appId);
+  if (!row) {
+    res.status(404).json({ message: 'Application not found.' });
+    return;
+  }
+  try {
+    const application = JSON.parse(row.payload_json);
+    res.json({ application });
+  } catch {
+    res.status(500).json({ message: 'Invalid application payload.' });
+  }
 });
 
 app.get('/api/admin/agents', requireAdmin, (_req, res) => {

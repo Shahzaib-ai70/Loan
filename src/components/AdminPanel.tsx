@@ -7,6 +7,7 @@ import { adminApi, applicationsApi, type AgentSummary, type Appointment } from '
 import { formatMoney, useCurrency } from '../lib/currency';
 import {
   type Application,
+  type Balance,
   type LoanStatus,
   type User,
   applyAdminSnapshot,
@@ -36,6 +37,7 @@ const BLOCKED_NOTICE_KEY = 'take_easy_loan_blocked_notice';
 const ADMIN_SECTION_KEY = 'take_easy_loan_admin_section';
 const TERM_OPTIONS: number[] = [3, 6, 12, 24, 36, 48, 60, 90, 120];
 const OPERATOR_NAME_KEY = 'take_easy_loan_admin_operator_name';
+const ADMIN_AUTO_REFRESH_KEY = 'take_easy_loan_admin_auto_refresh';
 const SUPER_ADMIN_INVITE_CODE = '12345678';
 
 const generateInviteCode = () => {
@@ -160,14 +162,45 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [agentSearch, setAgentSearch] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [overviewUsers, setOverviewUsers] = useState<User[]>([]);
+  const [overviewApps, setOverviewApps] = useState<Application[]>([]);
+  const [overviewBalances, setOverviewBalances] = useState<Record<string, Balance>>({});
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(ADMIN_AUTO_REFRESH_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
 
   const adminLoggedIn = useMemo(() => isAdminLoggedIn(), [refreshKey]);
   const dbSnapshot = useMemo(() => getDb(), [refreshKey]);
-  const users = useMemo(() => Object.values(dbSnapshot.users), [dbSnapshot.users]);
-  const apps = useMemo(
-    () => Object.values(dbSnapshot.applications).sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0)),
-    [dbSnapshot.applications],
-  );
+  const users = useMemo(() => {
+    if (overviewUsers.length) return overviewUsers;
+    return Object.values(dbSnapshot.users);
+  }, [dbSnapshot.users, overviewUsers]);
+  const apps = useMemo(() => {
+    const base = overviewApps.length ? overviewApps : Object.values(dbSnapshot.applications);
+    return base.slice().sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
+  }, [dbSnapshot.applications, overviewApps]);
+
+  const balances = useMemo(() => {
+    if (Object.keys(overviewBalances).length) return overviewBalances;
+    return dbSnapshot.balances || {};
+  }, [dbSnapshot.balances, overviewBalances]);
+
+  const userById = useMemo(() => {
+    const map: Record<string, User> = {};
+    for (const u of users) map[u.id] = u;
+    return map;
+  }, [users]);
+
+  const appById = useMemo(() => {
+    const map: Record<string, Application> = {};
+    for (const a of apps) map[a.id] = a;
+    return map;
+  }, [apps]);
 
   const latestAppsPerUser = useMemo(() => {
     const seen = new Set<string>();
@@ -191,13 +224,13 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const filteredApps = useMemo(() => {
     const normalized = usernameFilter.trim().toLowerCase();
     const result = latestAppsPerUser.filter((app) => {
-      const u = dbSnapshot.users[app.userId];
+      const u = userById[app.userId];
       if (!normalized) return true;
       const userText = `${u?.phoneOrEmail ?? ''} ${app.applicant.fullName}`.toLowerCase();
       return userText.includes(normalized);
     });
     return result.slice(0, perPage);
-  }, [dbSnapshot.users, latestAppsPerUser, perPage, usernameFilter]);
+  }, [latestAppsPerUser, perPage, userById, usernameFilter]);
 
   const currencyOptions = useMemo(
     () => [
@@ -302,20 +335,27 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     setError('');
     try {
       const overview = await adminApi.getOverview(adminPin);
-      applyAdminSnapshot({
-        users: (overview.users || []).map((u) => ({
-          id: u.id,
-          gender: (u.gender as User['gender']) || 'Male',
-          phoneOrEmail: u.phoneOrEmail,
-          password: '',
-          inviteCode: u.inviteCode || '',
-          createdAt: u.createdAt,
-          lastApplicationId: u.lastApplicationId,
-          disabledLogin: !!u.disabledLogin,
-        })),
-        applications: (overview.applications || []) as Application[],
-        balances: overview.balances || {},
-      });
+      const nextUsers: User[] = (overview.users || []).map((u) => ({
+        id: u.id,
+        gender: (u.gender as User['gender']) || 'Male',
+        phoneOrEmail: u.phoneOrEmail,
+        password: '',
+        inviteCode: u.inviteCode || '',
+        agentId: u.agentId,
+        createdAt: u.createdAt,
+        lastApplicationId: u.lastApplicationId,
+        disabledLogin: !!u.disabledLogin,
+      }));
+      const nextApps = (overview.applications || []) as Application[];
+      const nextBalances = (overview.balances || {}) as Record<string, Balance>;
+      setOverviewUsers(nextUsers);
+      setOverviewApps(nextApps);
+      setOverviewBalances(nextBalances);
+      setLastSyncAt(Date.now());
+      try {
+        applyAdminSnapshot({ users: nextUsers, applications: nextApps, balances: nextBalances });
+      } catch {
+      }
       setRefreshKey((x) => x + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load admin data.');
@@ -428,6 +468,21 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (section === 'agents') loadAgents();
     if (section === 'appointments') loadAppointments();
   }, [adminLoggedIn]);
+
+  useEffect(() => {
+    if (!adminLoggedIn) return;
+    try {
+      localStorage.setItem(ADMIN_AUTO_REFRESH_KEY, autoRefreshEnabled ? '1' : '0');
+    } catch {
+    }
+    if (!autoRefreshEnabled) return;
+    const id = window.setInterval(() => {
+      syncFromServer();
+      if (section === 'agents') loadAgents();
+      if (section === 'appointments') loadAppointments();
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [adminLoggedIn, autoRefreshEnabled, section]);
 
   useEffect(() => {
     try {
@@ -732,6 +787,29 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             <div className="text-3xl font-light text-slate-500">≡</div>
             <div className="flex items-center gap-4 text-sm">
               {syncing && <span className="font-semibold text-slate-500">Syncing…</span>}
+              <span className="font-semibold text-slate-500">
+                Last Sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : '—'}
+              </span>
+              <label className="flex items-center gap-2 font-semibold text-slate-500">
+                <input
+                  type="checkbox"
+                  checked={autoRefreshEnabled}
+                  onChange={(e) => setAutoRefreshEnabled(e.target.checked)}
+                />
+                Auto Refresh
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 rounded px-3 text-xs font-bold"
+                onClick={() => {
+                  syncFromServer();
+                  if (section === 'agents') loadAgents();
+                  if (section === 'appointments') loadAppointments();
+                }}
+              >
+                Refresh
+              </Button>
               <span className="font-semibold text-slate-500">Operator: {operatorName || 'Admin'}</span>
               <Button className="h-8 rounded bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700" onClick={logout}>
                 Logout

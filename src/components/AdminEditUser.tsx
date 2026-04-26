@@ -54,9 +54,17 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
     return placeholder;
   };
 
-  const load = () => {
+  const load = async () => {
     const db = getDb();
-    const app = db.applications[appId];
+    let app = db.applications[appId] ?? null;
+    const adminPin = db.admin.pin.trim();
+    if (adminPin) {
+      try {
+        const res = await adminApi.getApplication(adminPin, appId);
+        app = (res.application as Application) ?? app;
+      } catch {
+      }
+    }
     if (!app) {
       setDraftApp(null);
       setDraftUser(null);
