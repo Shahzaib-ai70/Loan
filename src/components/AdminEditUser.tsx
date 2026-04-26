@@ -104,8 +104,9 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
     }
     setError('');
     const nextBalance = Number(balanceInput) || 0;
+    const { documents: _documents, ...appPatch } = draftApp;
     adminApi
-      .updateApplication(adminPin, draftApp.id, draftApp)
+      .updateApplication(adminPin, draftApp.id, appPatch)
       .catch(async (e) => {
         const msg = e instanceof Error ? e.message : 'Unable to save changes.';
         if (msg.toLowerCase().includes('application not found')) {
