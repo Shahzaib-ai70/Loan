@@ -349,10 +349,22 @@ export const applyAdminSnapshot = (payload: {
     db.users[user.id] = user;
     if (!db.balances[user.id]) db.balances[user.id] = { currentBalance: 0, withdrawnAmount: 0 };
   }
+  const latestByUserId: Record<string, Application> = {};
   for (const app of payload.applications) {
-    db.applications[app.id] = pruneHeavyDocuments(app, 'light');
-    const user = db.users[app.userId];
-    if (user) user.lastApplicationId = app.id;
+    const userId = app.userId;
+    if (!userId) continue;
+    const current = latestByUserId[userId];
+    const nextSubmitted = Number(app.submittedAt ?? 0) || 0;
+    const currentSubmitted = Number(current?.submittedAt ?? 0) || 0;
+    if (!current || nextSubmitted >= currentSubmitted) latestByUserId[userId] = app;
+  }
+
+  db.applications = {};
+  for (const app of Object.values(latestByUserId)) {
+    const pruned = pruneHeavyDocuments(app, 'light');
+    db.applications[pruned.id] = pruned;
+    const user = db.users[pruned.userId];
+    if (user) user.lastApplicationId = pruned.id;
   }
   for (const [userId, balance] of Object.entries(payload.balances || {})) {
     db.balances[userId] = balance;
