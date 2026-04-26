@@ -96,6 +96,8 @@ const DB_KEY = 'take_easy_loan_db';
 const USER_KEY = 'take_easy_loan_user';
 const APP_KEY = 'take_easy_loan_application';
 const SESSION_KEY = 'take_easy_loan_session';
+const ADMIN_PIN_KEY = 'take_easy_loan_admin_pin';
+const ADMIN_SESSION_KEY = 'take_easy_loan_admin_session';
 
 const defaultDb = (): Db => ({
   users: {},
@@ -128,17 +130,36 @@ const pruneHeavyDocuments = (app: Application, mode: 'light' | 'full'): Applicat
 export const getDb = (): Db => {
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if (!raw) return defaultDb();
-    const parsed = JSON.parse(raw) as Db;
-    if (!parsed || typeof parsed !== 'object') return defaultDb();
-    return {
-      ...defaultDb(),
-      ...parsed,
-      admin: {
-        ...defaultDb().admin,
-        ...(parsed.admin ?? {}),
-      },
-    };
+    const base = (() => {
+      if (!raw) return defaultDb();
+      const parsed = JSON.parse(raw) as Db;
+      if (!parsed || typeof parsed !== 'object') return defaultDb();
+      return {
+        ...defaultDb(),
+        ...parsed,
+        admin: {
+          ...defaultDb().admin,
+          ...(parsed.admin ?? {}),
+        },
+      };
+    })();
+
+    try {
+      const rawAdminPin = localStorage.getItem(ADMIN_PIN_KEY);
+      if (rawAdminPin && rawAdminPin.trim()) base.admin.pin = rawAdminPin.trim();
+    } catch {
+    }
+
+    try {
+      const rawAdminSession = localStorage.getItem(ADMIN_SESSION_KEY);
+      if (rawAdminSession) {
+        const session = JSON.parse(rawAdminSession) as AdminSession;
+        if (session?.isAdmin) base.admin.session = session;
+      }
+    } catch {
+    }
+
+    return base;
   } catch {
     return defaultDb();
   }
@@ -161,7 +182,6 @@ export const saveDb = (db: Db) => {
           Object.entries(db.applications).map(([id, app]) => [id, pruneHeavyDocuments(app, 'full')]),
         ),
       };
-      localStorage.removeItem(DB_KEY);
       localStorage.setItem(DB_KEY, JSON.stringify(pruned));
     } catch {
     }
@@ -351,9 +371,22 @@ export const setAdminSession = (isAdmin: boolean) => {
   const db = getDb();
   db.admin.session = isAdmin ? { isAdmin: true, lastLoginAt: Date.now() } : null;
   saveDb(db);
+  try {
+    if (db.admin.session) localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(db.admin.session));
+    else localStorage.removeItem(ADMIN_SESSION_KEY);
+  } catch {
+  }
 };
 
 export const isAdminLoggedIn = (): boolean => {
+  try {
+    const raw = localStorage.getItem(ADMIN_SESSION_KEY);
+    if (raw) {
+      const session = JSON.parse(raw) as AdminSession;
+      if (session?.isAdmin) return true;
+    }
+  } catch {
+  }
   const db = getDb();
   return !!db.admin.session?.isAdmin;
 };
@@ -367,6 +400,10 @@ export const setAdminPin = (pin: string) => {
   const db = getDb();
   db.admin.pin = pin;
   saveDb(db);
+  try {
+    localStorage.setItem(ADMIN_PIN_KEY, pin);
+  } catch {
+  }
 };
 
 export const deleteUserLocal = (userId: string) => {
