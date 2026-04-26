@@ -339,6 +339,27 @@ export const upsertUser = (user: User) => {
   saveDb(db);
 };
 
+export const applyAdminSnapshot = (payload: {
+  users: User[];
+  applications: Application[];
+  balances: Record<string, Balance>;
+}) => {
+  const db = getDb();
+  for (const user of payload.users) {
+    db.users[user.id] = user;
+    if (!db.balances[user.id]) db.balances[user.id] = { currentBalance: 0, withdrawnAmount: 0 };
+  }
+  for (const app of payload.applications) {
+    db.applications[app.id] = pruneHeavyDocuments(app, 'light');
+    const user = db.users[app.userId];
+    if (user) user.lastApplicationId = app.id;
+  }
+  for (const [userId, balance] of Object.entries(payload.balances || {})) {
+    db.balances[userId] = balance;
+  }
+  saveDb(db);
+};
+
 export const getUserBalance = (userId: string): Balance => {
   const db = getDb();
   return db.balances[userId] ?? { currentBalance: 0, withdrawnAmount: 0 };

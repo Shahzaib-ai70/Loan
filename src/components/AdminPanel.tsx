@@ -9,6 +9,7 @@ import {
   type Application,
   type LoanStatus,
   type User,
+  applyAdminSnapshot,
   deleteUserLocal,
   getDb,
   getSession,
@@ -301,8 +302,8 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     setError('');
     try {
       const overview = await adminApi.getOverview(adminPin);
-      for (const u of overview.users) {
-        upsertUser({
+      applyAdminSnapshot({
+        users: (overview.users || []).map((u) => ({
           id: u.id,
           gender: (u.gender as User['gender']) || 'Male',
           phoneOrEmail: u.phoneOrEmail,
@@ -311,14 +312,10 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           createdAt: u.createdAt,
           lastApplicationId: u.lastApplicationId,
           disabledLogin: !!u.disabledLogin,
-        });
-      }
-      for (const a of overview.applications) {
-        upsertApplication(a as Application);
-      }
-      for (const [userId, balance] of Object.entries(overview.balances || {})) {
-        setUserBalance(userId, balance);
-      }
+        })),
+        applications: (overview.applications || []) as Application[],
+        balances: overview.balances || {},
+      });
       setRefreshKey((x) => x + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load admin data.');
@@ -428,17 +425,17 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   useEffect(() => {
     if (!adminLoggedIn) return;
     syncFromServer();
-    loadAgents();
-    loadAppointments();
+    if (section === 'agents') loadAgents();
+    if (section === 'appointments') loadAppointments();
   }, [adminLoggedIn]);
 
   useEffect(() => {
     if (!adminLoggedIn) return;
     const id = window.setInterval(() => {
       syncFromServer();
-      loadAgents();
-      loadAppointments();
-    }, 10000);
+      if (section === 'agents') loadAgents();
+      if (section === 'appointments') loadAppointments();
+    }, 20000);
     return () => window.clearInterval(id);
   }, [adminLoggedIn, section]);
 
