@@ -164,7 +164,6 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [overviewUsers, setOverviewUsers] = useState<User[]>([]);
   const [overviewApps, setOverviewApps] = useState<Application[]>([]);
-  const [overviewBalances, setOverviewBalances] = useState<Record<string, Balance>>({});
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => {
     try {
@@ -184,11 +183,6 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     const base = overviewApps.length ? overviewApps : Object.values(dbSnapshot.applications);
     return base.slice().sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
   }, [dbSnapshot.applications, overviewApps]);
-
-  const balances = useMemo(() => {
-    if (Object.keys(overviewBalances).length) return overviewBalances;
-    return dbSnapshot.balances || {};
-  }, [dbSnapshot.balances, overviewBalances]);
 
   const userById = useMemo(() => {
     const map: Record<string, User> = {};
@@ -350,7 +344,6 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       const nextBalances = (overview.balances || {}) as Record<string, Balance>;
       setOverviewUsers(nextUsers);
       setOverviewApps(nextApps);
-      setOverviewBalances(nextBalances);
       setLastSyncAt(Date.now());
       try {
         applyAdminSnapshot({ users: nextUsers, applications: nextApps, balances: nextBalances });
