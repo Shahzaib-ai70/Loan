@@ -120,6 +120,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [section, setSection] = useState<Section>(() => {
     try {
       const urlSection = new URLSearchParams(window.location.search).get('adminSection');
@@ -385,6 +386,20 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const login = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+    if (loginLoading) return;
+    if (loginMode === 'pin') {
+      const p = pinLogin.trim();
+      if (p.length !== 6) {
+        setError('PIN is required.');
+        return;
+      }
+    } else {
+      if (!username.trim() || !password) {
+        setError('Username and password are required.');
+        return;
+      }
+    }
+    setLoginLoading(true);
     try {
       const res =
         loginMode === 'pin'
@@ -392,6 +407,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           : await adminApi.login({ username, password });
       setAdminPin(res.adminPin);
       setAdminSession(true);
+      setRefreshKey((x) => x + 1);
       try {
         const nextOp = loginMode === 'password' ? username.trim() || 'Admin' : 'Admin';
         localStorage.setItem(OPERATOR_NAME_KEY, nextOp);
@@ -401,9 +417,11 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       setPassword('');
       setPinLogin('');
       await syncFromServer(res.adminPin);
-      loadAgents();
+      await loadAgents();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid admin login.');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
