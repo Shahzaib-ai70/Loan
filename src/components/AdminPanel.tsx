@@ -430,16 +430,6 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   }, [adminLoggedIn]);
 
   useEffect(() => {
-    if (!adminLoggedIn) return;
-    const id = window.setInterval(() => {
-      syncFromServer();
-      if (section === 'agents') loadAgents();
-      if (section === 'appointments') loadAppointments();
-    }, 20000);
-    return () => window.clearInterval(id);
-  }, [adminLoggedIn, section]);
-
-  useEffect(() => {
     try {
       localStorage.setItem(ADMIN_SECTION_KEY, section);
       const url = new URL(window.location.href);
