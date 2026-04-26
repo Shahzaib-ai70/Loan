@@ -501,9 +501,14 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
 
   const openEdit = (appId: string) => {
     const db = getDb();
-    const app = db.applications[appId];
-    if (!app) return;
-    ensureUserForApp(app);
+    const app = appById[appId] ?? db.applications[appId];
+    if (app) {
+      ensureUserForApp(app);
+      try {
+        upsertApplication(app);
+      } catch {
+      }
+    }
     onOpenEdit(appId);
   };
 
