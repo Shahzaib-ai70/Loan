@@ -43,6 +43,13 @@ export type AppSettings = {
   currencySymbol: string;
 };
 
+export type PageErrorConfig = {
+  enabled: boolean;
+  message: string;
+};
+
+export type PageErrors = Record<string, PageErrorConfig>;
+
 export type AdminLoginResponse = {
   ok: boolean;
   adminPin: string;
@@ -145,11 +152,16 @@ export type AdminAppointmentsResponse = {
 
 export type PublicSettingsResponse = {
   settings: AppSettings;
+  pageErrors?: PageErrors;
 };
 
 export type AdminUpdateAppSettingsResponse = {
   ok: boolean;
   settings: AppSettings;
+};
+
+export type AdminPageErrorsResponse = {
+  pageErrors: PageErrors;
 };
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -253,6 +265,14 @@ export const adminApi = {
       method: 'PUT',
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify(payload),
+    }),
+  getPageErrors: (adminPin: string) =>
+    request<AdminPageErrorsResponse>(`/api/admin/page-errors`, { headers: { 'x-admin-pin': adminPin } }),
+  updatePageErrors: (adminPin: string, pageErrors: PageErrors) =>
+    request<{ ok: boolean; pageErrors: PageErrors }>(`/api/admin/page-errors`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify({ pageErrors }),
     }),
 };
 

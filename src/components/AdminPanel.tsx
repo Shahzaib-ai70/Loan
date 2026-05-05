@@ -3,7 +3,7 @@ import { Eye, KeyRound, Pencil, Trash2, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
-import { adminApi, applicationsApi, type AgentSummary, type Appointment } from '../lib/api';
+import { adminApi, applicationsApi, type AgentSummary, type Appointment, type PageErrors } from '../lib/api';
 import { formatMoney, useCurrency } from '../lib/currency';
 import {
   type Application,
@@ -38,6 +38,27 @@ const ADMIN_SECTION_KEY = 'take_easy_loan_admin_section';
 const TERM_OPTIONS: number[] = [3, 6, 12, 24, 36, 48, 60, 90, 120];
 const OPERATOR_NAME_KEY = 'take_easy_loan_admin_operator_name';
 const ADMIN_AUTO_REFRESH_KEY = 'take_easy_loan_admin_auto_refresh';
+const PAGE_ERROR_OPTIONS: { key: string; label: string }[] = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'register', label: 'Register' },
+  { key: 'auth', label: 'Login' },
+  { key: 'loan-application', label: 'Loan Application' },
+  { key: 'application-status', label: 'Application Status' },
+  { key: 'withdraw', label: 'Withdraw' },
+  { key: 'profile', label: 'Profile' },
+  { key: 'my-information', label: 'My Information' },
+  { key: 'my-information-id', label: 'My Information (ID)' },
+  { key: 'my-information-contact', label: 'My Information (Contact)' },
+  { key: 'my-information-bank', label: 'My Information (Bank)' },
+  { key: 'my-information-signature', label: 'My Information (Signature)' },
+  { key: 'loan-contract', label: 'Loan Contract' },
+  { key: 'terms-and-conditions', label: 'Terms & Conditions' },
+  { key: 'appointment', label: 'Appointment' },
+  { key: 'offers', label: 'Offers' },
+  { key: 'exchange-rates', label: 'Exchange Rates' },
+  { key: 'deposit-rates', label: 'Deposit Rates' },
+  { key: 'live-chat', label: 'Live Chat' },
+];
 const SUPER_ADMIN_INVITE_CODE = '12345678';
 
 const generateInviteCode = () => {
@@ -162,6 +183,11 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [agentSearch, setAgentSearch] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [pageErrors, setPageErrors] = useState<PageErrors>({});
+  const [pageErrorKey, setPageErrorKey] = useState(() => PAGE_ERROR_OPTIONS[0]?.key || 'dashboard');
+  const [pageErrorEnabled, setPageErrorEnabled] = useState(true);
+  const [pageErrorMessage, setPageErrorMessage] = useState('');
+  const [pageErrorsLoading, setPageErrorsLoading] = useState(false);
   const [overviewUsers, setOverviewUsers] = useState<User[]>([]);
   const [overviewApps, setOverviewApps] = useState<Application[]>([]);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
@@ -175,6 +201,11 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
 
   const adminLoggedIn = useMemo(() => isAdminLoggedIn(), [refreshKey]);
   const dbSnapshot = useMemo(() => getDb(), [refreshKey]);
+  useEffect(() => {
+    const cfg = pageErrors[pageErrorKey];
+    setPageErrorEnabled(!!cfg?.enabled);
+    setPageErrorMessage(String(cfg?.message || ''));
+  }, [pageErrorKey, pageErrors]);
   const users = useMemo(() => {
     if (overviewUsers.length) return overviewUsers;
     return Object.values(dbSnapshot.users);
@@ -259,6 +290,43 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       setCurrencySymbol(res.settings.currencySymbol);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to update settings.');
+    }
+  };
+
+  const loadPageErrors = async () => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    setPageErrorsLoading(true);
+    setError('');
+    try {
+      const res = await adminApi.getPageErrors(adminPin);
+      setPageErrors(res.pageErrors || {});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load page errors.');
+    } finally {
+      setPageErrorsLoading(false);
+    }
+  };
+
+  const savePageError = async (key: string, enabled: boolean, message: string) => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) {
+      setError('Admin session expired. Please logout and login again.');
+      return;
+    }
+    const next: PageErrors = {
+      ...pageErrors,
+      [key]: { enabled: !!enabled, message: String(message || '').trim() },
+    };
+    setPageErrorsLoading(true);
+    setError('');
+    try {
+      const res = await adminApi.updatePageErrors(adminPin, next);
+      setPageErrors(res.pageErrors || next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save page error.');
+    } finally {
+      setPageErrorsLoading(false);
     }
   };
 
@@ -460,7 +528,8 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     syncFromServer();
     if (section === 'agents') loadAgents();
     if (section === 'appointments') loadAppointments();
-  }, [adminLoggedIn]);
+    if (section === 'settings') loadPageErrors();
+  }, [adminLoggedIn, section]);
 
   useEffect(() => {
     if (!adminLoggedIn) return;
@@ -473,6 +542,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       syncFromServer();
       if (section === 'agents') loadAgents();
       if (section === 'appointments') loadAppointments();
+      if (section === 'settings') loadPageErrors();
     }, 15000);
     return () => window.clearInterval(id);
   }, [adminLoggedIn, autoRefreshEnabled, section]);
@@ -1328,6 +1398,76 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                         </option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                <div className="mt-10 max-w-xl space-y-3">
+                  <div className="text-sm font-extrabold text-slate-900">Page error message</div>
+                  <div className="text-xs font-semibold text-slate-500">
+                    Show a manual message on a selected customer page.
+                  </div>
+
+                  <div className="pt-2">
+                    <div className="mb-1 text-xs font-bold text-slate-700">Page</div>
+                    <select
+                      className={field}
+                      value={pageErrorKey}
+                      onChange={(e) => setPageErrorKey(e.target.value)}
+                    >
+                      {PAGE_ERROR_OPTIONS.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={pageErrorEnabled}
+                      onChange={(e) => setPageErrorEnabled(e.target.checked)}
+                    />
+                    Enabled
+                  </label>
+
+                  <div className="pt-2">
+                    <div className="mb-1 text-xs font-bold text-slate-700">Message</div>
+                    <textarea
+                      value={pageErrorMessage}
+                      onChange={(e) => setPageErrorMessage(e.target.value.slice(0, 1500))}
+                      placeholder="Write error message..."
+                      className="mt-2 min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button
+                      type="button"
+                      className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={pageErrorsLoading}
+                      onClick={() => savePageError(pageErrorKey, pageErrorEnabled, pageErrorMessage)}
+                    >
+                      {pageErrorsLoading ? 'Saving…' : 'Save'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded px-4 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={pageErrorsLoading}
+                      onClick={() => savePageError(pageErrorKey, false, '')}
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded px-4 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={pageErrorsLoading}
+                      onClick={loadPageErrors}
+                    >
+                      Refresh
+                    </Button>
                   </div>
                 </div>
               </div>

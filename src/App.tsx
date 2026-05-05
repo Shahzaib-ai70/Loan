@@ -26,7 +26,7 @@ import { DepositRatesPage } from './components/DepositRatesPage';
 import { WebsiteNotWorking } from './components/WebsiteNotWorking';
 import { Modal } from './components/Modal';
 import { Button } from './components/ui/Button';
-import { applicationsApi, usersApi } from './lib/api';
+import { applicationsApi, publicApi, usersApi, type PageErrors } from './lib/api';
 import {
   ensureMigration,
   getCurrentUser,
@@ -149,10 +149,35 @@ function App() {
       return 'dashboard';
     }
   });
+  const [pageErrors, setPageErrors] = useState<PageErrors>({});
+  const [dismissedPageErrorKey, setDismissedPageErrorKey] = useState('');
 
   useEffect(() => {
     ensureMigration();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      publicApi
+        .getSettings()
+        .then((res) => {
+          if (!alive) return;
+          setPageErrors(res.pageErrors || {});
+        })
+        .catch(() => {});
+    };
+    load();
+    const id = window.setInterval(load, 15000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  useEffect(() => {
+    setDismissedPageErrorKey('');
+  }, [currentView]);
 
   const navigate = useCallback(
     (view: View) => {
@@ -352,6 +377,13 @@ function App() {
     );
   }
 
+  const currentPageError = pageErrors[currentView];
+  const pageErrorText =
+    currentView !== 'admin' && currentView !== 'agent' && currentView !== 'admin-edit' && currentPageError?.enabled
+      ? String(currentPageError.message || '').trim()
+      : '';
+  const activePageErrorKey = pageErrorText ? `${currentView}:${pageErrorText}` : '';
+
   return (
     <Layout
       onNavigate={navigate}
@@ -359,6 +391,26 @@ function App() {
       hideFooter
     >
       <TopBar onNavigate={navigate} showLogout={!!getSession()?.isLoggedIn} onLogout={handleUserLogout} />
+
+      <Modal
+        open={!!pageErrorText && dismissedPageErrorKey !== activePageErrorKey}
+        title="Error"
+        onClose={() => setDismissedPageErrorKey(activePageErrorKey)}
+        maxWidthClassName="max-w-xl"
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 whitespace-pre-wrap">
+            {pageErrorText}
+          </div>
+          <Button
+            type="button"
+            className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]"
+            onClick={() => setDismissedPageErrorKey(activePageErrorKey)}
+          >
+            OK
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={alreadyAppliedOpen} title="Loan Application" onClose={() => setAlreadyAppliedOpen(false)}>
         <div className="space-y-4">

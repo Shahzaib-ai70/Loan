@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'node:crypto';
 import { db, initDb, now } from './db.js';
+import { readPageErrors, writePageErrors } from './pageErrors.js';
 
 initDb();
 
@@ -846,6 +847,7 @@ app.get('/api/support/settings', (_req, res) => {
 app.get('/api/public/settings', (_req, res) => {
   res.json({
     settings: getAppSettings(),
+    pageErrors: readPageErrors(),
   });
 });
 
@@ -877,6 +879,15 @@ app.put('/api/admin/app/settings', requireAdmin, (req, res) => {
   const symbol = String(currencySymbol || '$').trim().slice(0, 4);
   db.prepare('UPDATE admin_settings SET currency_sign_enabled = ?, currency_symbol = ? WHERE id = 1').run(enabled, symbol || '$');
   res.json({ ok: true, settings: getAppSettings() });
+});
+
+app.get('/api/admin/page-errors', requireAdmin, (_req, res) => {
+  res.json({ pageErrors: readPageErrors() });
+});
+
+app.put('/api/admin/page-errors', requireAdmin, (req, res) => {
+  const next = writePageErrors(req.body?.pageErrors);
+  res.json({ ok: true, pageErrors: next });
 });
 
 app.post('/api/admin/chat/messages/:userId', requireAdmin, (req, res) => {
