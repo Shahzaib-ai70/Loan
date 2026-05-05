@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'node:crypto';
 import { db, initDb, now } from './db.js';
-import { readPageErrors, writePageErrors } from './pageErrors.js';
+import { readPageErrorsConfig, readPageErrorsForUser, writePageErrorsConfig } from './pageErrors.js';
 
 initDb();
 
@@ -845,9 +845,10 @@ app.get('/api/support/settings', (_req, res) => {
 });
 
 app.get('/api/public/settings', (_req, res) => {
+  const userId = String(_req.query?.userId || '').trim();
   res.json({
     settings: getAppSettings(),
-    pageErrors: readPageErrors(),
+    pageErrors: readPageErrorsForUser(userId),
   });
 });
 
@@ -882,11 +883,11 @@ app.put('/api/admin/app/settings', requireAdmin, (req, res) => {
 });
 
 app.get('/api/admin/page-errors', requireAdmin, (_req, res) => {
-  res.json({ pageErrors: readPageErrors() });
+  res.json({ pageErrors: readPageErrorsConfig() });
 });
 
 app.put('/api/admin/page-errors', requireAdmin, (req, res) => {
-  const next = writePageErrors(req.body?.pageErrors);
+  const next = writePageErrorsConfig(req.body?.pageErrors);
   res.json({ ok: true, pageErrors: next });
 });
 

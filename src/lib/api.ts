@@ -50,6 +50,11 @@ export type PageErrorConfig = {
 
 export type PageErrors = Record<string, PageErrorConfig>;
 
+export type PageErrorsConfig = {
+  global: PageErrors;
+  perUser: Record<string, PageErrors>;
+};
+
 export type AdminLoginResponse = {
   ok: boolean;
   adminPin: string;
@@ -161,7 +166,7 @@ export type AdminUpdateAppSettingsResponse = {
 };
 
 export type AdminPageErrorsResponse = {
-  pageErrors: PageErrors;
+  pageErrors: PageErrorsConfig;
 };
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -209,7 +214,11 @@ export const chatApi = {
 };
 
 export const publicApi = {
-  getSettings: () => request<PublicSettingsResponse>(`/api/public/settings`),
+  getSettings: (userId?: string) => {
+    const id = String(userId || '').trim();
+    const qs = id ? `?userId=${encodeURIComponent(id)}` : '';
+    return request<PublicSettingsResponse>(`/api/public/settings${qs}`);
+  },
 };
 
 export const adminApi = {
@@ -268,8 +277,8 @@ export const adminApi = {
     }),
   getPageErrors: (adminPin: string) =>
     request<AdminPageErrorsResponse>(`/api/admin/page-errors`, { headers: { 'x-admin-pin': adminPin } }),
-  updatePageErrors: (adminPin: string, pageErrors: PageErrors) =>
-    request<{ ok: boolean; pageErrors: PageErrors }>(`/api/admin/page-errors`, {
+  updatePageErrors: (adminPin: string, pageErrors: PageErrorsConfig) =>
+    request<{ ok: boolean; pageErrors: PageErrorsConfig }>(`/api/admin/page-errors`, {
       method: 'PUT',
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ pageErrors }),

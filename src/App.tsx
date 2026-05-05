@@ -159,8 +159,10 @@ function App() {
   useEffect(() => {
     let alive = true;
     const load = () => {
+      const session = getSession();
+      const userId = session?.isLoggedIn ? session.userId : '';
       publicApi
-        .getSettings()
+        .getSettings(userId)
         .then((res) => {
           if (!alive) return;
           setPageErrors(res.pageErrors || {});

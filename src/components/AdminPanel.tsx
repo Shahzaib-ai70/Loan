@@ -3,7 +3,7 @@ import { Eye, KeyRound, Pencil, Trash2, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { AdminSupportChat } from './AdminSupportChat';
-import { adminApi, applicationsApi, type AgentSummary, type Appointment, type PageErrors } from '../lib/api';
+import { adminApi, applicationsApi, type AgentSummary, type Appointment, type PageErrors, type PageErrorsConfig } from '../lib/api';
 import { formatMoney, useCurrency } from '../lib/currency';
 import {
   type Application,
@@ -128,6 +128,16 @@ const readFileAsDataUrl = async (file: File): Promise<string> => {
 const isSection = (value: string): value is Section =>
   ['dashboard', 'customers', 'loans', 'appointments', 'support', 'agents', 'settings'].includes(value);
 
+const normalizePageErrorsConfig = (raw: unknown): PageErrorsConfig => {
+  const base = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const hasGlobal = base && typeof base === 'object' && 'global' in base;
+  const hasPerUser = base && typeof base === 'object' && 'perUser' in base;
+  if (!hasGlobal && !hasPerUser) return { global: base as unknown as PageErrors, perUser: {} };
+  const global = (base.global && typeof base.global === 'object' ? (base.global as unknown as PageErrors) : {}) || {};
+  const perUser = (base.perUser && typeof base.perUser === 'object' ? (base.perUser as Record<string, PageErrors>) : {}) || {};
+  return { global, perUser };
+};
+
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
@@ -183,8 +193,9 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [agentSearch, setAgentSearch] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [pageErrors, setPageErrors] = useState<PageErrors>({});
+  const [pageErrorsConfig, setPageErrorsConfig] = useState<PageErrorsConfig>({ global: {}, perUser: {} });
   const [pageErrorKey, setPageErrorKey] = useState(() => PAGE_ERROR_OPTIONS[0]?.key || 'dashboard');
+  const [pageErrorTargetUserId, setPageErrorTargetUserId] = useState('');
   const [pageErrorEnabled, setPageErrorEnabled] = useState(true);
   const [pageErrorMessage, setPageErrorMessage] = useState('');
   const [pageErrorsLoading, setPageErrorsLoading] = useState(false);
@@ -202,10 +213,11 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const adminLoggedIn = useMemo(() => isAdminLoggedIn(), [refreshKey]);
   const dbSnapshot = useMemo(() => getDb(), [refreshKey]);
   useEffect(() => {
-    const cfg = pageErrors[pageErrorKey];
+    const userCfg = pageErrorTargetUserId ? pageErrorsConfig.perUser?.[pageErrorTargetUserId]?.[pageErrorKey] : undefined;
+    const cfg = userCfg || pageErrorsConfig.global?.[pageErrorKey];
     setPageErrorEnabled(!!cfg?.enabled);
     setPageErrorMessage(String(cfg?.message || ''));
-  }, [pageErrorKey, pageErrors]);
+  }, [pageErrorKey, pageErrorTargetUserId, pageErrorsConfig.global, pageErrorsConfig.perUser]);
   const users = useMemo(() => {
     if (overviewUsers.length) return overviewUsers;
     return Object.values(dbSnapshot.users);
@@ -300,7 +312,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     setError('');
     try {
       const res = await adminApi.getPageErrors(adminPin);
-      setPageErrors(res.pageErrors || {});
+      setPageErrorsConfig(normalizePageErrorsConfig(res.pageErrors));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load page errors.');
     } finally {
@@ -308,21 +320,28 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     }
   };
 
-  const savePageError = async (key: string, enabled: boolean, message: string) => {
+  const savePageError = async (key: string, enabled: boolean, message: string, targetUserId: string) => {
     const adminPin = getDb().admin.pin.trim();
     if (!adminPin) {
       setError('Admin session expired. Please logout and login again.');
       return;
     }
-    const next: PageErrors = {
-      ...pageErrors,
-      [key]: { enabled: !!enabled, message: String(message || '').trim() },
-    };
+    const targetId = String(targetUserId || '').trim();
+    const next = normalizePageErrorsConfig(pageErrorsConfig);
+    const nextEntry = { enabled: !!enabled, message: String(message || '').trim() };
+    if (!targetId) {
+      next.global = { ...next.global, [key]: nextEntry };
+    } else {
+      next.perUser = {
+        ...next.perUser,
+        [targetId]: { ...(next.perUser[targetId] || {}), [key]: nextEntry },
+      };
+    }
     setPageErrorsLoading(true);
     setError('');
     try {
       const res = await adminApi.updatePageErrors(adminPin, next);
-      setPageErrors(res.pageErrors || next);
+      setPageErrorsConfig(normalizePageErrorsConfig(res.pageErrors || next));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save page error.');
     } finally {
@@ -1422,6 +1441,25 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                     </select>
                   </div>
 
+                  <div className="pt-2">
+                    <div className="mb-1 text-xs font-bold text-slate-700">User</div>
+                    <select
+                      className={field}
+                      value={pageErrorTargetUserId}
+                      onChange={(e) => setPageErrorTargetUserId(e.target.value)}
+                    >
+                      <option value="">All users</option>
+                      {users
+                        .slice()
+                        .sort((a, b) => String(a.phoneOrEmail || '').localeCompare(String(b.phoneOrEmail || '')))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.phoneOrEmail || u.id} ({u.id})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
                   <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
                     <input
                       type="checkbox"
@@ -1446,7 +1484,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                       type="button"
                       className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={pageErrorsLoading}
-                      onClick={() => savePageError(pageErrorKey, pageErrorEnabled, pageErrorMessage)}
+                      onClick={() => savePageError(pageErrorKey, pageErrorEnabled, pageErrorMessage, pageErrorTargetUserId)}
                     >
                       {pageErrorsLoading ? 'Saving…' : 'Save'}
                     </Button>
@@ -1455,7 +1493,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                       variant="outline"
                       className="h-9 rounded px-4 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={pageErrorsLoading}
-                      onClick={() => savePageError(pageErrorKey, false, '')}
+                      onClick={() => savePageError(pageErrorKey, false, '', pageErrorTargetUserId)}
                     >
                       Clear
                     </Button>
