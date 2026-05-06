@@ -31,6 +31,12 @@ const scoreLabel = (score: number) => {
 const CreditScoreGauge = ({ score }: { score: number }) => {
   const pct = Math.max(0, Math.min(100, (score / 1000) * 100));
   const label = scoreLabel(score);
+  const cx = 120;
+  const cy = 120;
+  const needleLen = 78;
+  const a = Math.PI - (Math.max(0, Math.min(1000, score)) / 1000) * Math.PI;
+  const nx = cx + Math.cos(a) * needleLen;
+  const ny = cy - Math.sin(a) * needleLen;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-center">
@@ -61,13 +67,17 @@ const CreditScoreGauge = ({ score }: { score: number }) => {
               pathLength={100}
               strokeDasharray={`${pct} 100`}
             />
-            <text x="52" y="38" fontSize="14" fill="#f59e0b" fontWeight="700">
+            <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
+            <circle cx={cx} cy={cy} r="6" fill="#0f172a" />
+            <circle cx={cx} cy={cy} r="3" fill="#ffffff" opacity="0.9" />
+
+            <text x="50" y="54" fontSize="14" fill="#f59e0b" fontWeight="700" textAnchor="middle">
               Fair
             </text>
-            <text x="108" y="24" fontSize="14" fill="#64748b" fontWeight="700">
+            <text x="120" y="22" fontSize="14" fill="#64748b" fontWeight="700" textAnchor="middle">
               Normal
             </text>
-            <text x="178" y="38" fontSize="14" fill="#22c55e" fontWeight="700">
+            <text x="190" y="54" fontSize="14" fill="#22c55e" fontWeight="700" textAnchor="middle">
               Good
             </text>
           </svg>
