@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
-import { agentApi } from '../lib/api';
+import { chatApi, agentApi, type ChatMessage, type ChatThread } from '../lib/api';
 import { type Application, type User } from '../lib/db';
 
 type AgentPanelProps = {
   onNavigate: (to: 'dashboard') => void;
 };
 
-type Section = 'customers' | 'loans';
+type Section = 'customers' | 'loans' | 'support';
 
 const card = 'rounded-sm border border-slate-200 bg-white';
 const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-[#0b4a90]';
@@ -51,6 +51,13 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
   const [withdrawErrorMedia, setWithdrawErrorMedia] = useState('');
   const [adjustUserId, setAdjustUserId] = useState<string | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
+  const [chatSelectedUserId, setChatSelectedUserId] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatText, setChatText] = useState('');
+  const [chatError, setChatError] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const chatListRef = useRef<HTMLDivElement | null>(null);
 
   const latestAppsPerUser = useMemo(() => {
     const sorted = apps.slice().sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
@@ -366,6 +373,11 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     setUsers([]);
     setApps([]);
     setBalances({});
+    setChatThreads([]);
+    setChatSelectedUserId(null);
+    setChatMessages([]);
+    setChatText('');
+    setChatError('');
     try {
       localStorage.removeItem(AGENT_KEY_STORAGE);
     } catch {
@@ -380,11 +392,88 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     return !!v;
   };
 
+  const loadChatThreads = useCallback(async () => {
+    const k = String(agentKey || '').trim();
+    if (!k) return;
+    setChatError('');
+    try {
+      const res = await chatApi.agentGetThreads(k);
+      setChatThreads(res.threads || []);
+      setChatSelectedUserId((prev) => prev || res.threads[0]?.userId || null);
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : 'Unable to load assigned chats.');
+    }
+  }, [agentKey]);
+
+  const loadChatMessages = useCallback(async () => {
+    const k = String(agentKey || '').trim();
+    if (!k || !chatSelectedUserId) return;
+    setChatError('');
+    try {
+      const res = await chatApi.agentGetMessages(k, chatSelectedUserId);
+      setChatMessages(res.messages || []);
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : 'Unable to load chat messages.');
+    }
+  }, [agentKey, chatSelectedUserId]);
+
+  const sendChat = useCallback(async () => {
+    const k = String(agentKey || '').trim();
+    if (!k || !chatSelectedUserId) return;
+    const msg = chatText.trim();
+    if (!msg) return;
+    setChatSending(true);
+    setChatError('');
+    try {
+      await chatApi.agentSendMessage(k, chatSelectedUserId, msg);
+      setChatText('');
+      await loadChatThreads();
+      await loadChatMessages();
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : 'Unable to send message.');
+    } finally {
+      setChatSending(false);
+    }
+  }, [agentKey, chatSelectedUserId, chatText, loadChatMessages, loadChatThreads]);
+
+  useEffect(() => {
+    if (section !== 'support') return;
+    loadChatThreads();
+    const id = window.setInterval(loadChatThreads, 2500);
+    return () => window.clearInterval(id);
+  }, [loadChatThreads, section]);
+
+  useEffect(() => {
+    if (section !== 'support') return;
+    loadChatMessages();
+    if (!chatSelectedUserId) return;
+    const id = window.setInterval(loadChatMessages, 1500);
+    return () => window.clearInterval(id);
+  }, [chatSelectedUserId, loadChatMessages, section]);
+
+  useEffect(() => {
+    if (section !== 'support') return;
+    const el = chatListRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chatMessages.length, section]);
+
   useEffect(() => {
     const customersAllowed = can('pages.customers');
     const loansAllowed = can('pages.loans');
-    if (section === 'customers' && !customersAllowed && loansAllowed) setSection('loans');
-    if (section === 'loans' && !loansAllowed && customersAllowed) setSection('customers');
+    const supportAllowed = can('support.chat');
+    if (section === 'customers' && !customersAllowed) {
+      if (loansAllowed) setSection('loans');
+      else if (supportAllowed) setSection('support');
+    }
+    if (section === 'loans' && !loansAllowed) {
+      if (customersAllowed) setSection('customers');
+      else if (supportAllowed) setSection('support');
+    }
+    if (section === 'support' && !supportAllowed) {
+      if (customersAllowed) setSection('customers');
+      else if (loansAllowed) setSection('loans');
+    }
   }, [agent?.permissions, section]);
 
   if (!agentKey) {
@@ -426,8 +515,10 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
 
   const totalCustomers = users.length;
   const totalLoans = apps.length;
+  const totalAssignedChats = chatThreads.length;
   const customersAllowed = can('pages.customers');
   const loansAllowed = can('pages.loans');
+  const supportAllowed = can('support.chat');
   const canViewEditUser =
     can('customers.editUser') || can('customers.editInviteCode') || can('customers.changePassword') || can('customers.disableLogin');
   const canWithdrawError = can('customers.withdrawError');
@@ -436,6 +527,7 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
   const canEditLoan = can('loans.editLoan');
   const canChangeStatus = can('loans.changeStatus');
   const canAdjustBalance = can('loans.addSubtract');
+  const selectedChatThread = useMemo(() => chatThreads.find((t) => t.userId === chatSelectedUserId) ?? null, [chatSelectedUserId, chatThreads]);
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f5f7fa]">
@@ -448,6 +540,7 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
           <nav className="p-2">
             {customersAllowed && <SidebarItem label="Customers" count={totalCustomers} active={section === 'customers'} onClick={() => setSection('customers')} />}
             {loansAllowed && <SidebarItem label="Loan List" count={totalLoans} active={section === 'loans'} onClick={() => setSection('loans')} />}
+            {supportAllowed && <SidebarItem label="Live Chat" count={totalAssignedChats} active={section === 'support'} onClick={() => setSection('support')} />}
           </nav>
         </aside>
 
@@ -472,29 +565,55 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
 
             <div className={`${card} p-4`}>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <h2 className="text-4xl font-semibold text-slate-800">{section === 'customers' ? 'Customer List' : 'Loan Orders'}</h2>
-                <Button type="button" className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700" onClick={() => loadOverview(agentKey)} disabled={loading}>
+                <h2 className="text-4xl font-semibold text-slate-800">
+                  {section === 'customers' ? 'Customer List' : section === 'loans' ? 'Loan Orders' : 'Assigned Chats'}
+                </h2>
+                <Button
+                  type="button"
+                  className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700"
+                  onClick={() => {
+                    if (section === 'support') {
+                      void loadChatThreads();
+                      void loadChatMessages();
+                      return;
+                    }
+                    void loadOverview(agentKey);
+                  }}
+                  disabled={loading}
+                >
                   {loading ? 'Loading…' : 'Refresh'}
                 </Button>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1.2fr_0.8fr_auto]">
-                <div>
-                  <div className="mb-1 text-xs font-bold text-slate-700">Search</div>
-                  <input className={field} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Enter username" />
+              {section !== 'support' && (
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1.2fr_0.8fr_auto]">
+                  <div>
+                    <div className="mb-1 text-xs font-bold text-slate-700">Search</div>
+                    <input className={field} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Enter username" />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs font-bold text-slate-700">Per Page</div>
+                    <select className={field} value={perPage} onChange={(e) => setPerPage(Number(e.target.value))}>
+                      {[10, 25, 50, 100].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-5 h-9 rounded px-4 text-xs font-bold"
+                    onClick={() => {
+                      setSearch('');
+                      setPerPage(50);
+                    }}
+                  >
+                    Reset
+                  </Button>
                 </div>
-                <div>
-                  <div className="mb-1 text-xs font-bold text-slate-700">Per Page</div>
-                  <select className={field} value={perPage} onChange={(e) => setPerPage(Number(e.target.value))}>
-                    {[10, 25, 50, 100].map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-                <Button type="button" variant="outline" className="mt-5 h-9 rounded px-4 text-xs font-bold" onClick={() => { setSearch(''); setPerPage(50); }}>
-                  Reset
-                </Button>
-              </div>
+              )}
 
               {section === 'customers' && (
                 <div className="mt-5 overflow-x-auto">
@@ -697,6 +816,106 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                       )}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {section === 'support' && (
+                <div className="mt-5">
+                  {chatError && (
+                    <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                      {chatError}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr]">
+                    <div className="border-b border-slate-200 lg:border-b-0 lg:border-r lg:border-slate-200">
+                      <div className="p-3">
+                        <div className="text-xs font-bold text-slate-600">Conversations</div>
+                      </div>
+                      <div className="max-h-[520px] overflow-auto">
+                        {chatThreads.length === 0 ? (
+                          <div className="px-4 pb-6 text-sm font-semibold text-slate-600">No assigned chats.</div>
+                        ) : (
+                          chatThreads.map((t) => {
+                            const active = t.userId === chatSelectedUserId;
+                            return (
+                              <button
+                                key={t.userId}
+                                type="button"
+                                className={`w-full border-b border-slate-100 px-4 py-3 text-left ${active ? 'bg-[#f4f6ff]' : 'bg-white hover:bg-slate-50'}`}
+                                onClick={() => setChatSelectedUserId(t.userId)}
+                              >
+                                <div className="text-sm font-extrabold text-slate-900">{t.phoneOrEmail || t.userId}</div>
+                                <div className="mt-0.5 line-clamp-1 text-xs font-semibold text-slate-600">{t.lastMessage || '-'}</div>
+                                <div className="mt-1 text-[11px] font-bold text-slate-400">{t.lastAt ? new Date(t.lastAt).toLocaleString() : ''}</div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex min-h-[520px] flex-col">
+                      <div className="border-b border-slate-200 px-4 py-3">
+                        <div className="text-sm font-extrabold text-slate-900">
+                          {selectedChatThread?.phoneOrEmail || chatSelectedUserId || 'Select a conversation'}
+                        </div>
+                        {chatSelectedUserId && <div className="text-xs font-semibold text-slate-500">User ID: {chatSelectedUserId}</div>}
+                      </div>
+
+                      <div ref={chatListRef} className="flex-1 overflow-auto bg-white px-4 py-4">
+                        {chatSelectedUserId ? (
+                          chatMessages.length === 0 ? (
+                            <div className="text-sm font-semibold text-slate-500">No messages in this conversation.</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {chatMessages.map((m) => {
+                                const mine = m.sender === 'admin';
+                                return (
+                                  <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                                    <div
+                                      className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm font-semibold ${
+                                        mine ? 'bg-[#0b4a90] text-white' : 'bg-slate-100 text-slate-800'
+                                      }`}
+                                    >
+                                      {m.message}
+                                      <div className={`mt-1 text-[10px] font-bold ${mine ? 'text-white/70' : 'text-slate-500'}`}>
+                                        {new Date(m.createdAt).toLocaleTimeString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )
+                        ) : (
+                          <div className="text-sm font-semibold text-slate-500">Select a conversation from the left.</div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-slate-200 p-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={chatText}
+                            onChange={(e) => setChatText(e.target.value)}
+                            placeholder="Type your reply..."
+                            className="h-11 flex-1 rounded-xl border border-slate-300 px-3 text-sm font-semibold outline-none focus:border-[#0b4a90]"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') void sendChat();
+                            }}
+                            disabled={!chatSelectedUserId}
+                          />
+                          <button
+                            type="button"
+                            className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0b4a90] px-4 text-sm font-extrabold text-white hover:bg-[#093b74] disabled:opacity-50"
+                            onClick={() => void sendChat()}
+                            disabled={!chatSelectedUserId || chatSending || !chatText.trim()}
+                          >
+                            {chatSending ? 'Sending…' : 'Send'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

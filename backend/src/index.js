@@ -5,6 +5,7 @@ import { db, initDb, now } from './db.js';
 import { readPageErrorsConfig, readPageErrorsForUser, writePageErrorsConfig } from './pageErrors.js';
 import { readCreditScore, writeCreditScore } from './creditScore.js';
 import { deleteAgentPermissionFor, readAgentPermissionFor, writeAgentPermissionFor } from './agentPermissions.js';
+import { readChatAssignments, readChatAssigneeForUser, writeChatAssigneeForUser } from './chatAssignments.js';
 
 initDb();
 
@@ -603,6 +604,104 @@ app.get('/api/agent/overview', requireAgent, (req, res) => {
   });
 });
 
+app.get('/api/agent/chat/threads', requireAgent, requireAgentPermission('support.chat'), (req, res) => {
+  const agent = req.agent;
+  const assignments = readChatAssignments();
+  const userIds = Object.entries(assignments || {})
+    .filter(([, a]) => String(a || '').trim() === agent.id)
+    .map(([u]) => String(u || '').trim())
+    .filter(Boolean);
+  if (!userIds.length) {
+    res.json({ threads: [] });
+    return;
+  }
+  const placeholders = userIds.map(() => '?').join(', ');
+  const rows = db
+    .prepare(
+      `SELECT m.user_id as user_id, MAX(m.created_at) as last_at
+       FROM chat_messages m
+       WHERE m.user_id IN (${placeholders})
+       GROUP BY m.user_id
+       ORDER BY last_at DESC`,
+    )
+    .all(...userIds);
+  const getUser = db.prepare('SELECT id, phone_or_email FROM users WHERE id = ?');
+  const getLastMsg = db.prepare('SELECT sender, message, created_at FROM chat_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 1');
+  res.json({
+    threads: rows.map((r) => {
+      const u = getUser.get(r.user_id);
+      const last = getLastMsg.get(r.user_id);
+      return {
+        userId: r.user_id,
+        phoneOrEmail: u?.phone_or_email || '',
+        lastMessage: last?.message || '',
+        lastSender: last?.sender || '',
+        lastAt: last?.created_at || 0,
+        assignedAgentId: agent.id,
+        assignedAgentUsername: agent.username,
+      };
+    }),
+  });
+});
+
+app.get('/api/agent/chat/messages/:userId', requireAgent, requireAgentPermission('support.chat'), (req, res) => {
+  const agent = req.agent;
+  const userId = String(req.params.userId || '').trim();
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required.' });
+    return;
+  }
+  const assigned = readChatAssigneeForUser(userId);
+  if (String(assigned || '').trim() !== agent.id) {
+    res.status(403).json({ message: 'Permission denied.' });
+    return;
+  }
+  const rows = db
+    .prepare('SELECT id, user_id, sender, message, created_at FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC')
+    .all(userId);
+  res.json({
+    messages: rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      sender: r.sender,
+      message: r.message,
+      createdAt: r.created_at,
+    })),
+  });
+});
+
+app.post('/api/agent/chat/messages/:userId', requireAgent, requireAgentPermission('support.chat'), (req, res) => {
+  const agent = req.agent;
+  const userId = String(req.params.userId || '').trim();
+  const message = String(req.body?.message || '').trim();
+  if (!userId || !message) {
+    res.status(400).json({ message: 'userId and message are required.' });
+    return;
+  }
+  const assigned = readChatAssigneeForUser(userId);
+  if (String(assigned || '').trim() !== agent.id) {
+    res.status(403).json({ message: 'Permission denied.' });
+    return;
+  }
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!user) {
+    db.prepare(
+      `INSERT INTO users (id, gender, phone_or_email, password, invite_code, created_at, last_application_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(userId, 'Male', `guest-${userId}@local`, 'guest', '', now(), null);
+    db.prepare('INSERT OR IGNORE INTO balances (user_id, current_balance, withdrawn_amount) VALUES (?, 0, 0)').run(userId);
+  }
+  const id = makeId('MSG');
+  db.prepare('INSERT INTO chat_messages (id, user_id, sender, message, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    id,
+    userId,
+    'admin',
+    message,
+    now(),
+  );
+  res.json({ ok: true, id });
+});
+
 app.put('/api/agent/applications/:appId', requireAgent, (req, res) => {
   const agent = req.agent;
   const { appId } = req.params;
@@ -932,6 +1031,7 @@ app.get('/api/chat/realtime/:userId', (req, res) => {
 });
 
 app.get('/api/admin/chat/threads', requireAdmin, (_req, res) => {
+  const assignments = readChatAssignments();
   const rows = db
     .prepare(
       `SELECT m.user_id as user_id, MAX(m.created_at) as last_at
@@ -942,16 +1042,21 @@ app.get('/api/admin/chat/threads', requireAdmin, (_req, res) => {
     .all();
   const getUser = db.prepare('SELECT id, phone_or_email FROM users WHERE id = ?');
   const getLastMsg = db.prepare('SELECT sender, message, created_at FROM chat_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 1');
+  const getAgent = db.prepare('SELECT id, username FROM agents WHERE id = ?');
   res.json({
     threads: rows.map((r) => {
       const u = getUser.get(r.user_id);
       const last = getLastMsg.get(r.user_id);
+      const assignedAgentId = String(assignments?.[r.user_id] || '').trim();
+      const a = assignedAgentId ? getAgent.get(assignedAgentId) : null;
       return {
         userId: r.user_id,
         phoneOrEmail: u?.phone_or_email || '',
         lastMessage: last?.message || '',
         lastSender: last?.sender || '',
         lastAt: last?.created_at || 0,
+        assignedAgentId: assignedAgentId || null,
+        assignedAgentUsername: a?.username || '',
       };
     }),
   });
@@ -1058,6 +1163,51 @@ app.post('/api/admin/chat/messages/:userId', requireAdmin, (req, res) => {
     now(),
   );
   res.json({ ok: true, id });
+});
+
+app.put('/api/admin/chat/threads/:userId/assign', requireAdmin, (req, res) => {
+  const userId = String(req.params.userId || '').trim();
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required.' });
+    return;
+  }
+  const agentId = String(req.body?.agentId || '').trim();
+  if (agentId) {
+    const exists = db.prepare('SELECT id FROM agents WHERE id = ?').get(agentId);
+    if (!exists) {
+      res.status(404).json({ message: 'Agent not found.' });
+      return;
+    }
+  }
+  writeChatAssigneeForUser(userId, agentId);
+  res.json({ ok: true, userId, agentId: agentId || null });
+});
+
+app.delete('/api/admin/chat/threads/:userId', requireAdmin, (req, res) => {
+  const userId = String(req.params.userId || '').trim();
+  if (!userId) {
+    res.status(400).json({ message: 'userId is required.' });
+    return;
+  }
+  db.prepare('DELETE FROM chat_messages WHERE user_id = ?').run(userId);
+  writeChatAssigneeForUser(userId, '');
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/chat/messages/:userId/:messageId', requireAdmin, (req, res) => {
+  const userId = String(req.params.userId || '').trim();
+  const messageId = String(req.params.messageId || '').trim();
+  if (!userId || !messageId) {
+    res.status(400).json({ message: 'userId and messageId are required.' });
+    return;
+  }
+  const row = db.prepare('SELECT id FROM chat_messages WHERE id = ? AND user_id = ?').get(messageId, userId);
+  if (!row) {
+    res.status(404).json({ message: 'Message not found.' });
+    return;
+  }
+  db.prepare('DELETE FROM chat_messages WHERE id = ?').run(messageId);
+  res.json({ ok: true });
 });
 
 const parseAppointmentMessage = (message) => {

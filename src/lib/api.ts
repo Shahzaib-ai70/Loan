@@ -29,6 +29,8 @@ export type ChatThread = {
   lastMessage: string;
   lastSender: string;
   lastAt: number;
+  assignedAgentId?: string | null;
+  assignedAgentUsername?: string;
 };
 
 export type SupportSettings = {
@@ -214,6 +216,36 @@ export const chatApi = {
     request<{ ok: boolean; id: string }>(`/api/admin/chat/messages/${encodeURIComponent(userId)}`, {
       method: 'POST',
       headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify({ message }),
+    }),
+  adminDeleteThread: (adminPin: string, userId: string) =>
+    request<{ ok: boolean }>(`/api/admin/chat/threads/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-pin': adminPin },
+    }),
+  adminDeleteMessage: (adminPin: string, userId: string, messageId: string) =>
+    request<{ ok: boolean }>(`/api/admin/chat/messages/${encodeURIComponent(userId)}/${encodeURIComponent(messageId)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-pin': adminPin },
+    }),
+  adminAssignThread: (adminPin: string, userId: string, agentId: string | null) =>
+    request<{ ok: boolean; userId: string; agentId: string | null }>(`/api/admin/chat/threads/${encodeURIComponent(userId)}/assign`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify({ agentId: agentId || '' }),
+    }),
+  agentGetThreads: (agentKey: string) =>
+    request<{ threads: ChatThread[] }>(`/api/agent/chat/threads`, {
+      headers: { 'x-agent-key': agentKey },
+    }),
+  agentGetMessages: (agentKey: string, userId: string) =>
+    request<{ messages: ChatMessage[] }>(`/api/agent/chat/messages/${encodeURIComponent(userId)}`, {
+      headers: { 'x-agent-key': agentKey },
+    }),
+  agentSendMessage: (agentKey: string, userId: string, message: string) =>
+    request<{ ok: boolean; id: string }>(`/api/agent/chat/messages/${encodeURIComponent(userId)}`, {
+      method: 'POST',
+      headers: { 'x-agent-key': agentKey },
       body: JSON.stringify({ message }),
     }),
 };
