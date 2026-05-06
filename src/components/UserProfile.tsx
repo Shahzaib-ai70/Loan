@@ -40,9 +40,9 @@ const CreditScoreGauge = ({ score }: { score: number }) => {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-2 flex items-center justify-between px-1 text-xs font-extrabold">
-        <div className="text-[#f59e0b]">Fair</div>
-        <div className="text-slate-500">Normal</div>
-        <div className="text-[#22c55e]">Good</div>
+        <div className="text-slate-600">Fair</div>
+        <div className="text-slate-600">Normal</div>
+        <div className="text-slate-600">Good</div>
       </div>
       <div className="flex items-center justify-center">
         <div className="relative w-full max-w-[320px]">
