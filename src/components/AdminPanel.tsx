@@ -851,6 +851,20 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             <Button type="submit" className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">
               Login
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 w-full rounded-lg text-sm font-extrabold"
+              onClick={() => {
+                const url = new URL(window.location.href);
+                url.pathname = '/drugload-admin';
+                url.searchParams.set('role', 'agent');
+                url.searchParams.delete('view');
+                window.location.href = url.toString();
+              }}
+            >
+              Agent Login
+            </Button>
             <Button type="button" variant="outline" className="h-11 w-full rounded-lg text-sm font-extrabold" onClick={() => onNavigate('dashboard')}>
               Back
             </Button>
