@@ -44,6 +44,9 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
   const [statusNote, setStatusNote] = useState('');
   const [codeModalAppId, setCodeModalAppId] = useState<string | null>(null);
   const [withdrawCode, setWithdrawCode] = useState('');
+  const [withdrawErrorModalAppId, setWithdrawErrorModalAppId] = useState<string | null>(null);
+  const [withdrawErrorText, setWithdrawErrorText] = useState('');
+  const [withdrawErrorMedia, setWithdrawErrorMedia] = useState('');
   const [adjustUserId, setAdjustUserId] = useState<string | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
 
@@ -209,6 +212,28 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
       await loadOverview(agentKey);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to update withdrawal code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveWithdrawError = async () => {
+    if (!agentKey || !withdrawErrorModalAppId) return;
+    setLoading(true);
+    setError('');
+    try {
+      const text = String(withdrawErrorText || '').trim();
+      const media = String(withdrawErrorMedia || '').trim();
+      await agentApi.updateApplication(agentKey, withdrawErrorModalAppId, {
+        withdrawError: text || undefined,
+        withdrawErrorMedia: media || undefined,
+      });
+      setWithdrawErrorModalAppId(null);
+      setWithdrawErrorText('');
+      setWithdrawErrorMedia('');
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to update withdraw error.');
     } finally {
       setLoading(false);
     }
@@ -443,6 +468,17 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                                     </Button>
                                     <Button
                                       type="button"
+                                      className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
+                                      onClick={() => {
+                                        setWithdrawErrorModalAppId(app.id);
+                                        setWithdrawErrorText(app.withdrawError || '');
+                                        setWithdrawErrorMedia(app.withdrawErrorMedia || '');
+                                      }}
+                                    >
+                                      Withdraw Error
+                                    </Button>
+                                    <Button
+                                      type="button"
                                       className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
                                       onClick={() => {
                                         setStatusModalAppId(app.id);
@@ -508,7 +544,7 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                   <table className="min-w-[1200px] w-full text-left text-sm">
                     <thead className="border-y border-slate-200 bg-white text-slate-700">
                       <tr>
-                        {['ID', 'Order Number', 'Date', 'User', 'Registered Amount', 'Term (Months)', 'Status'].map((h) => (
+                        {['ID', 'Order Number', 'Date', 'User', 'Invite Code', 'Balance', 'Withdrawn', 'Registered Amount', 'Term (Months)', 'Status', 'Actions'].map((h) => (
                           <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
                         ))}
                       </tr>
@@ -520,21 +556,58 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                         const orderNo = String(app.id).replace('APP-', '');
                         const date = new Date(app.submittedAt).toLocaleString();
                         const statusText = app.statusLabel || (app.status === 'approved' ? 'Approved' : app.status === 'rejected' ? 'Rejected' : 'Under Review');
+                        const bal = balances[app.userId] || { currentBalance: 0, withdrawnAmount: 0 };
                         return (
                           <tr key={app.id} className="border-b border-slate-100">
                             <td className="px-3 py-2 font-semibold">{rowId}</td>
                             <td className="px-3 py-2">{orderNo}</td>
                             <td className="px-3 py-2">{date}</td>
                             <td className="px-3 py-2">{u?.phoneOrEmail || app.applicant.fullName || '-'}</td>
+                            <td className="px-3 py-2">{u?.inviteCode || '-'}</td>
+                            <td className="px-3 py-2">{bal.currentBalance.toLocaleString()}</td>
+                            <td className="px-3 py-2">{bal.withdrawnAmount.toLocaleString()}</td>
                             <td className="px-3 py-2">{app.loan.amount.toLocaleString()}</td>
                             <td className="px-3 py-2">{app.loan.termMonths}</td>
                             <td className="px-3 py-2">{statusText}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700"
+                                  onClick={() => openEdit(app.userId)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
+                                  onClick={() => {
+                                    setStatusModalAppId(app.id);
+                                    setStatusValue(app.status);
+                                    setStatusLabel(app.statusLabel || '');
+                                    setStatusNote(app.statusNote || '');
+                                  }}
+                                >
+                                  Change Status
+                                </Button>
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-amber-500 px-2 text-xs font-bold text-white hover:bg-amber-600"
+                                  onClick={() => {
+                                    setAdjustUserId(app.userId);
+                                    setAdjustAmount('');
+                                  }}
+                                >
+                                  Add/Subtract
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
                       {!filteredApps.length && (
                         <tr>
-                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={7}>
+                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={11}>
                             No loans found.
                           </td>
                         </tr>
@@ -623,6 +696,39 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
               Save
             </Button>
             <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setCodeModalAppId(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!withdrawErrorModalAppId} title="Withdraw Error" onClose={() => setWithdrawErrorModalAppId(null)} maxWidthClassName="max-w-xl">
+        <div className="space-y-4">
+          <textarea
+            value={withdrawErrorText}
+            onChange={(e) => setWithdrawErrorText(e.target.value.slice(0, 1500))}
+            placeholder="Write error message for withdraw page (leave empty to disable)"
+            className="min-h-[120px] w-full rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0b4a90]"
+          />
+          <input
+            value={withdrawErrorMedia}
+            onChange={(e) => setWithdrawErrorMedia(e.target.value.slice(0, 45000))}
+            placeholder="Optional media URL / data URL"
+            className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]"
+          />
+          <div className="flex gap-2">
+            <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={saveWithdrawError} disabled={loading}>
+              Save
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 rounded px-4 text-sm font-bold"
+              onClick={() => {
+                setWithdrawErrorModalAppId(null);
+                setWithdrawErrorText('');
+                setWithdrawErrorMedia('');
+              }}
+            >
               Cancel
             </Button>
           </div>
