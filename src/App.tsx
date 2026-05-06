@@ -8,6 +8,7 @@ import { ApplicationStatus } from './components/ApplicationStatus';
 import { WithdrawPage } from './components/WithdrawPage';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminEditUser } from './components/AdminEditUser';
+import { AgentPanel } from './components/AgentPanel';
 import { TopBar } from './components/TopBar';
 import { UserProfile } from './components/UserProfile';
 import { MyInformation } from './components/MyInformation';
@@ -46,6 +47,7 @@ export type View =
   | 'withdraw'
   | 'auth'
   | 'admin'
+  | 'agent'
   | 'admin-edit'
   | 'profile'
   | 'my-information'
@@ -65,6 +67,7 @@ const VIEW_KEY = 'take_easy_loan_current_view';
 const DEFAULT_PUBLIC_PATH_PREFIX = '/online-ca';
 const ADMIN_PATH = '/drugload-admin';
 const AGENT_PATH = '/drugload-agent';
+const ROLE_KEY = 'role';
 const TERMS_ACCEPTED_KEY_PREFIX = 'take_easy_loan_terms_accepted_user_';
 
 const normalizePath = (pathname: string) => {
@@ -90,6 +93,7 @@ const isView = (value: string): value is View =>
     'withdraw',
     'auth',
     'admin',
+    'agent',
     'admin-edit',
     'profile',
     'my-information',
@@ -136,13 +140,16 @@ function App() {
   const [currentView, setCurrentView] = useState<View>(() => {
     try {
       const p = normalizePath(window.location.pathname || '/');
-      if (p === ADMIN_PATH) return 'admin';
-      if (p === AGENT_PATH) return 'admin';
+      if (p === AGENT_PATH) return 'agent';
+      if (p === ADMIN_PATH) {
+        const role = new URLSearchParams(window.location.search).get(ROLE_KEY);
+        if (String(role || '').toLowerCase() === 'agent') return 'agent';
+        return 'admin';
+      }
       const urlView = new URLSearchParams(window.location.search).get('view');
-      if (urlView === 'agent') return 'admin';
+      if (urlView === 'agent') return 'agent';
       if (urlView && isView(urlView)) return urlView;
       const raw = localStorage.getItem(VIEW_KEY);
-      if (raw === 'agent') return 'admin';
       return raw && isView(raw) ? raw : 'dashboard';
     } catch {
       return 'dashboard';
@@ -253,9 +260,11 @@ function App() {
     if (blockedPath) return;
     localStorage.setItem(VIEW_KEY, currentView);
     const url = new URL(window.location.href);
-    if (currentView === 'admin') {
+    if (currentView === 'admin' || currentView === 'agent') {
       url.pathname = ADMIN_PATH;
       url.searchParams.delete('view');
+      if (currentView === 'agent') url.searchParams.set(ROLE_KEY, 'agent');
+      else url.searchParams.delete(ROLE_KEY);
     } else {
       url.pathname = publicBasePath;
       url.searchParams.set('view', currentView);
@@ -377,7 +386,7 @@ function App() {
 
   const currentPageError = pageErrors[currentView];
   const pageErrorText =
-    currentView !== 'admin' && currentView !== 'admin-edit' && currentPageError?.enabled
+    currentView !== 'admin' && currentView !== 'agent' && currentView !== 'admin-edit' && currentPageError?.enabled
       ? String(currentPageError.message || '').trim()
       : '';
   const activePageErrorKey = pageErrorText ? `${currentView}:${pageErrorText}` : '';
@@ -466,6 +475,12 @@ function App() {
       {currentView === 'withdraw' && (
         <div className="bg-gray-50 min-h-[calc(100vh-80px)]">
           <WithdrawPage onNavigate={navigate} />
+        </div>
+      )}
+
+      {currentView === 'agent' && (
+        <div className="bg-gray-50 min-h-[calc(100vh-80px)]">
+          <AgentPanel onNavigate={(to) => navigate(to)} />
         </div>
       )}
 

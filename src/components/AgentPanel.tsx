@@ -29,7 +29,7 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
       return '';
     }
   });
-  const [agent, setAgent] = useState<{ id: string; username: string; inviteCode: string } | null>(null);
+  const [agent, setAgent] = useState<{ id: string; username: string; inviteCode: string; permissions?: Record<string, boolean> | null } | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [apps, setApps] = useState<Application[]>([]);
   const [balances, setBalances] = useState<Record<string, { currentBalance: number; withdrawnAmount: number }>>({});
@@ -372,6 +372,21 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     }
   };
 
+  const can = (key: string) => {
+    const perms = agent?.permissions;
+    if (!perms) return true;
+    const v = perms[key];
+    if (v == null) return true;
+    return !!v;
+  };
+
+  useEffect(() => {
+    const customersAllowed = can('pages.customers');
+    const loansAllowed = can('pages.loans');
+    if (section === 'customers' && !customersAllowed && loansAllowed) setSection('loans');
+    if (section === 'loans' && !loansAllowed && customersAllowed) setSection('customers');
+  }, [agent?.permissions, section]);
+
   if (!agentKey) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-10">
@@ -411,6 +426,16 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
 
   const totalCustomers = users.length;
   const totalLoans = apps.length;
+  const customersAllowed = can('pages.customers');
+  const loansAllowed = can('pages.loans');
+  const canViewEditUser =
+    can('customers.editUser') || can('customers.editInviteCode') || can('customers.changePassword') || can('customers.disableLogin');
+  const canWithdrawError = can('customers.withdrawError');
+  const canDeleteUser = can('customers.deleteUser');
+  const canDisableLogin = can('customers.disableLogin');
+  const canEditLoan = can('loans.editLoan');
+  const canChangeStatus = can('loans.changeStatus');
+  const canAdjustBalance = can('loans.addSubtract');
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f5f7fa]">
@@ -421,8 +446,8 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
             <div className="text-lg font-semibold text-slate-700">Agent</div>
           </div>
           <nav className="p-2">
-            <SidebarItem label="Customers" count={totalCustomers} active={section === 'customers'} onClick={() => setSection('customers')} />
-            <SidebarItem label="Loan List" count={totalLoans} active={section === 'loans'} onClick={() => setSection('loans')} />
+            {customersAllowed && <SidebarItem label="Customers" count={totalCustomers} active={section === 'customers'} onClick={() => setSection('customers')} />}
+            {loansAllowed && <SidebarItem label="Loan List" count={totalLoans} active={section === 'loans'} onClick={() => setSection('loans')} />}
           </nav>
         </aside>
 
@@ -499,67 +524,81 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                             <td className="px-3 py-2">{app ? statusText : '-'}</td>
                             <td className="px-3 py-2">
                               <div className="flex flex-wrap gap-2">
-                                <Button type="button" className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700" onClick={() => openEdit(u.id)}>
-                                  View/Edit
-                                </Button>
+                                {canViewEditUser && (
+                                  <Button type="button" className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700" onClick={() => openEdit(u.id)}>
+                                    View/Edit
+                                  </Button>
+                                )}
                                 {app && (
                                   <>
-                                    <Button
-                                      type="button"
-                                      className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
-                                      onClick={() => {
-                                        setWithdrawErrorModalAppId(app.id);
-                                        setWithdrawErrorText(app.withdrawError || '');
-                                        setWithdrawErrorMedia(app.withdrawErrorMedia || '');
-                                      }}
-                                    >
-                                      Withdraw Error
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
-                                      onClick={() => {
-                                        setStatusModalAppId(app.id);
-                                        setStatusValue(app.status);
-                                        setStatusLabel(app.statusLabel || '');
-                                        setStatusNote(app.statusNote || '');
-                                      }}
-                                    >
-                                      Status
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      className="h-8 rounded bg-slate-600 px-2 text-xs font-bold text-white hover:bg-slate-700"
-                                      onClick={() => {
-                                        setCodeModalAppId(app.id);
-                                        setWithdrawCode(app.withdrawCode || '');
-                                      }}
-                                    >
-                                      Code
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      className="h-8 rounded bg-amber-500 px-2 text-xs font-bold text-white hover:bg-amber-600"
-                                      onClick={() => {
-                                        setAdjustUserId(u.id);
-                                        setAdjustAmount('');
-                                      }}
-                                    >
-                                      Balance
-                                    </Button>
+                                    {canWithdrawError && (
+                                      <Button
+                                        type="button"
+                                        className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
+                                        onClick={() => {
+                                          setWithdrawErrorModalAppId(app.id);
+                                          setWithdrawErrorText(app.withdrawError || '');
+                                          setWithdrawErrorMedia(app.withdrawErrorMedia || '');
+                                        }}
+                                      >
+                                        Withdraw Error
+                                      </Button>
+                                    )}
+                                    {canChangeStatus && (
+                                      <Button
+                                        type="button"
+                                        className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
+                                        onClick={() => {
+                                          setStatusModalAppId(app.id);
+                                          setStatusValue(app.status);
+                                          setStatusLabel(app.statusLabel || '');
+                                          setStatusNote(app.statusNote || '');
+                                        }}
+                                      >
+                                        Status
+                                      </Button>
+                                    )}
+                                    {canEditLoan && (
+                                      <Button
+                                        type="button"
+                                        className="h-8 rounded bg-slate-600 px-2 text-xs font-bold text-white hover:bg-slate-700"
+                                        onClick={() => {
+                                          setCodeModalAppId(app.id);
+                                          setWithdrawCode(app.withdrawCode || '');
+                                        }}
+                                      >
+                                        Code
+                                      </Button>
+                                    )}
+                                    {canAdjustBalance && (
+                                      <Button
+                                        type="button"
+                                        className="h-8 rounded bg-amber-500 px-2 text-xs font-bold text-white hover:bg-amber-600"
+                                        onClick={() => {
+                                          setAdjustUserId(u.id);
+                                          setAdjustAmount('');
+                                        }}
+                                      >
+                                        Balance
+                                      </Button>
+                                    )}
                                   </>
                                 )}
-                                <Button
-                                  type="button"
-                                  className="h-8 rounded bg-teal-600 px-2 text-xs font-bold text-white hover:bg-teal-700"
-                                  onClick={() => toggleDisableLogin(u.id)}
-                                  disabled={loading}
-                                >
-                                  {u.disabledLogin ? 'Enable Login' : 'Disable Login'}
-                                </Button>
-                                <Button type="button" className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700" onClick={() => deleteUser(u.id)}>
-                                  Delete
-                                </Button>
+                                {canDisableLogin && (
+                                  <Button
+                                    type="button"
+                                    className="h-8 rounded bg-teal-600 px-2 text-xs font-bold text-white hover:bg-teal-700"
+                                    onClick={() => toggleDisableLogin(u.id)}
+                                    disabled={loading}
+                                  >
+                                    {u.disabledLogin ? 'Enable Login' : 'Disable Login'}
+                                  </Button>
+                                )}
+                                {canDeleteUser && (
+                                  <Button type="button" className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700" onClick={() => deleteUser(u.id)}>
+                                    Delete
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -609,35 +648,41 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                             <td className="px-3 py-2">{statusText}</td>
                             <td className="px-3 py-2">
                               <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700"
-                                  onClick={() => openEdit(app.userId)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
-                                  onClick={() => {
-                                    setStatusModalAppId(app.id);
-                                    setStatusValue(app.status);
-                                    setStatusLabel(app.statusLabel || '');
-                                    setStatusNote(app.statusNote || '');
-                                  }}
-                                >
-                                  Change Status
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="h-8 rounded bg-amber-500 px-2 text-xs font-bold text-white hover:bg-amber-600"
-                                  onClick={() => {
-                                    setAdjustUserId(app.userId);
-                                    setAdjustAmount('');
-                                  }}
-                                >
-                                  Add/Subtract
-                                </Button>
+                                {canEditLoan && (
+                                  <Button
+                                    type="button"
+                                    className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700"
+                                    onClick={() => openEdit(app.userId)}
+                                  >
+                                    Edit
+                                  </Button>
+                                )}
+                                {canChangeStatus && (
+                                  <Button
+                                    type="button"
+                                    className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
+                                    onClick={() => {
+                                      setStatusModalAppId(app.id);
+                                      setStatusValue(app.status);
+                                      setStatusLabel(app.statusLabel || '');
+                                      setStatusNote(app.statusNote || '');
+                                    }}
+                                  >
+                                    Change Status
+                                  </Button>
+                                )}
+                                {canAdjustBalance && (
+                                  <Button
+                                    type="button"
+                                    className="h-8 rounded bg-amber-500 px-2 text-xs font-bold text-white hover:bg-amber-600"
+                                    onClick={() => {
+                                      setAdjustUserId(app.userId);
+                                      setAdjustAmount('');
+                                    }}
+                                  >
+                                    Add/Subtract
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>

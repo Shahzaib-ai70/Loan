@@ -90,6 +90,7 @@ export type AgentSummary = {
   inviteCode: string;
   createdAt: number;
   totalCustomers: number;
+  permissions?: Record<string, boolean>;
 };
 
 export type AdminAgentsResponse = {
@@ -99,11 +100,11 @@ export type AdminAgentsResponse = {
 export type AgentLoginResponse = {
   ok: boolean;
   agentKey: string;
-  agent: { id: string; username: string; inviteCode: string; createdAt: number };
+  agent: { id: string; username: string; inviteCode: string; createdAt: number; permissions?: Record<string, boolean> | null };
 };
 
 export type AgentOverviewResponse = {
-  agent: { id: string; username: string; inviteCode: string };
+  agent: { id: string; username: string; inviteCode: string; permissions?: Record<string, boolean> | null };
   users: ApiUser[];
   applications: unknown[];
   balances: Record<string, { currentBalance: number; withdrawnAmount: number }>;
@@ -244,11 +245,21 @@ export const adminApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify(payload),
     }),
-  createAgent: (adminPin: string, payload: { username: string; password: string; inviteCode: string }) =>
+  createAgent: (adminPin: string, payload: { username: string; password: string; inviteCode: string; permissions?: Record<string, boolean> }) =>
     request<{ agent: AgentSummary }>(`/api/admin/agents`, {
       method: 'POST',
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify(payload),
+    }),
+  getAgentPermissions: (adminPin: string, agentId: string) =>
+    request<{ permissions: Record<string, boolean> }>(`/api/admin/agents/${encodeURIComponent(agentId)}/permissions`, {
+      headers: { 'x-admin-pin': adminPin },
+    }),
+  updateAgentPermissions: (adminPin: string, agentId: string, permissions: Record<string, boolean>) =>
+    request<{ ok: boolean; permissions: Record<string, boolean> }>(`/api/admin/agents/${encodeURIComponent(agentId)}/permissions`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify({ permissions }),
     }),
   updateApplication: (adminPin: string, appId: string, patch: unknown) =>
     request<{ application: unknown }>(`/api/admin/applications/${encodeURIComponent(appId)}`, {

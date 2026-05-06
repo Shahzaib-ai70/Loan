@@ -60,6 +60,19 @@ const PAGE_ERROR_OPTIONS: { key: string; label: string }[] = [
   { key: 'live-chat', label: 'Live Chat' },
 ];
 const SUPER_ADMIN_INVITE_CODE = '12345678';
+const DEFAULT_AGENT_PERMISSIONS: Record<string, boolean> = {
+  'pages.customers': true,
+  'pages.loans': true,
+  'customers.editUser': true,
+  'customers.editInviteCode': true,
+  'customers.changePassword': true,
+  'customers.disableLogin': true,
+  'customers.withdrawError': true,
+  'customers.deleteUser': true,
+  'loans.editLoan': true,
+  'loans.changeStatus': true,
+  'loans.addSubtract': true,
+};
 
 const generateInviteCode = () => {
   const chars = '0123456789';
@@ -190,6 +203,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [agentUsername, setAgentUsername] = useState('');
   const [agentPassword, setAgentPassword] = useState('');
   const [agentInviteCode, setAgentInviteCode] = useState('');
+  const [agentPermissions, setAgentPermissions] = useState<Record<string, boolean>>(() => ({ ...DEFAULT_AGENT_PERMISSIONS }));
   const [agentSearch, setAgentSearch] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -487,11 +501,12 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     setAgentsLoading(true);
     setError('');
     try {
-      await adminApi.createAgent(adminPin, { username: u, password: p, inviteCode: inv });
+      await adminApi.createAgent(adminPin, { username: u, password: p, inviteCode: inv, permissions: agentPermissions });
       setAgentModalOpen(false);
       setAgentUsername('');
       setAgentPassword('');
       setAgentInviteCode('');
+      setAgentPermissions({ ...DEFAULT_AGENT_PERMISSIONS });
       await loadAgents();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create agent.');
@@ -1747,6 +1762,33 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             placeholder="Invite code (auto)"
             className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]"
           />
+          <div className="rounded border border-slate-200 p-3">
+            <div className="text-sm font-extrabold text-slate-800">Agent Access</div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {[
+                { key: 'pages.customers', label: 'Customers page' },
+                { key: 'pages.loans', label: 'Loan list page' },
+                { key: 'customers.editUser', label: 'Edit user details' },
+                { key: 'customers.editInviteCode', label: 'Edit invite code' },
+                { key: 'customers.changePassword', label: 'Change password' },
+                { key: 'customers.disableLogin', label: 'Disable/Enable login' },
+                { key: 'customers.withdrawError', label: 'Withdraw error' },
+                { key: 'customers.deleteUser', label: 'Delete user' },
+                { key: 'loans.editLoan', label: 'Edit loan' },
+                { key: 'loans.changeStatus', label: 'Change loan status' },
+                { key: 'loans.addSubtract', label: 'Add/Subtract balance' },
+              ].map((p) => (
+                <label key={p.key} className="flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={!!agentPermissions[p.key]}
+                    onChange={(e) => setAgentPermissions((prev) => ({ ...prev, [p.key]: e.target.checked }))}
+                  />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={createAgent} disabled={agentsLoading}>
               {agentsLoading ? 'Creating…' : 'Create'}

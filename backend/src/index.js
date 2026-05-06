@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { db, initDb, now } from './db.js';
 import { readPageErrorsConfig, readPageErrorsForUser, writePageErrorsConfig } from './pageErrors.js';
 import { readCreditScore, writeCreditScore } from './creditScore.js';
+import { readAgentPermissionFor, writeAgentPermissionFor } from './agentPermissions.js';
 
 initDb();
 
@@ -48,9 +49,11 @@ const verifyAdminPassword = (username, password) => {
 
 const getAgentByKey = (agentKey) => {
   if (!agentKey) return null;
-  return db
+  const agent = db
     .prepare('SELECT id, username, invite_code, api_key FROM agents WHERE api_key = ?')
     .get(String(agentKey).trim());
+  if (!agent) return null;
+  return { ...agent, permissions: readAgentPermissionFor(agent.id) };
 };
 
 const requireAdmin = (req, res, next) => {
@@ -70,6 +73,22 @@ const requireAgent = (req, res, next) => {
     return;
   }
   req.agent = agent;
+  next();
+};
+
+const hasAgentPermission = (agent, key) => {
+  const perms = agent?.permissions;
+  if (!perms) return true;
+  const v = perms?.[key];
+  if (v == null) return true;
+  return !!v;
+};
+
+const requireAgentPermission = (key) => (req, res, next) => {
+  if (!hasAgentPermission(req.agent, key)) {
+    res.status(403).json({ message: 'Permission denied.' });
+    return;
+  }
   next();
 };
 
@@ -364,7 +383,13 @@ app.post('/api/agent/login', (req, res) => {
   res.json({
     ok: true,
     agentKey: agent.api_key,
-    agent: { id: agent.id, username: agent.username, inviteCode: agent.invite_code, createdAt: agent.created_at },
+    agent: {
+      id: agent.id,
+      username: agent.username,
+      inviteCode: agent.invite_code,
+      createdAt: agent.created_at,
+      permissions: readAgentPermissionFor(agent.id),
+    },
   });
 });
 
@@ -454,12 +479,13 @@ app.get('/api/admin/agents', requireAdmin, (_req, res) => {
       inviteCode: a.invite_code,
       createdAt: a.created_at,
       totalCustomers: totals[a.id] || 0,
+      permissions: readAgentPermissionFor(a.id),
     })),
   });
 });
 
 app.post('/api/admin/agents', requireAdmin, (req, res) => {
-  const { username = '', password = '', inviteCode = '' } = req.body || {};
+  const { username = '', password = '', inviteCode = '', permissions = null } = req.body || {};
   const u = String(username || '').trim();
   const p = String(password || '');
   const inv = String(inviteCode || '').trim();
@@ -483,7 +509,37 @@ app.post('/api/admin/agents', requireAdmin, (req, res) => {
     `INSERT INTO agents (id, username, password, invite_code, api_key, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
   ).run(id, u, p, inv, apiKey, now());
-  res.json({ agent: { id, username: u, inviteCode: inv, createdAt: now() } });
+  if (permissions && typeof permissions === 'object') writeAgentPermissionFor(id, permissions);
+  res.json({ agent: { id, username: u, inviteCode: inv, createdAt: now(), permissions: readAgentPermissionFor(id) } });
+});
+
+app.get('/api/admin/agents/:agentId/permissions', requireAdmin, (req, res) => {
+  const agentId = String(req.params.agentId || '').trim();
+  if (!agentId) {
+    res.status(400).json({ message: 'agentId is required.' });
+    return;
+  }
+  res.json({ permissions: readAgentPermissionFor(agentId) || {} });
+});
+
+app.put('/api/admin/agents/:agentId/permissions', requireAdmin, (req, res) => {
+  const agentId = String(req.params.agentId || '').trim();
+  if (!agentId) {
+    res.status(400).json({ message: 'agentId is required.' });
+    return;
+  }
+  const exists = db.prepare('SELECT id FROM agents WHERE id = ?').get(agentId);
+  if (!exists) {
+    res.status(404).json({ message: 'Agent not found.' });
+    return;
+  }
+  const permissions = req.body?.permissions;
+  if (!permissions || typeof permissions !== 'object') {
+    res.status(400).json({ message: 'permissions is required.' });
+    return;
+  }
+  writeAgentPermissionFor(agentId, permissions);
+  res.json({ ok: true, permissions: readAgentPermissionFor(agentId) || {} });
 });
 
 app.get('/api/agent/overview', requireAgent, (req, res) => {
@@ -514,7 +570,7 @@ app.get('/api/agent/overview', requireAgent, (req, res) => {
     ]),
   );
   res.json({
-    agent: { id: agent.id, username: agent.username, inviteCode: agent.invite_code },
+    agent: { id: agent.id, username: agent.username, inviteCode: agent.invite_code, permissions: agent.permissions || null },
     users: users.map((u) => ({
       id: u.id,
       gender: u.gender,
@@ -546,6 +602,29 @@ app.put('/api/agent/applications/:appId', requireAgent, (req, res) => {
   }
   const oldPayload = JSON.parse(row.payload_json);
   const updated = { ...oldPayload, ...req.body, id: appId };
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'withdrawError') || Object.prototype.hasOwnProperty.call(req.body || {}, 'withdrawErrorMedia')) {
+    if (!hasAgentPermission(agent, 'customers.withdrawError')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'status') || Object.prototype.hasOwnProperty.call(req.body || {}, 'approvedAt')) {
+    if (!hasAgentPermission(agent, 'loans.changeStatus')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(req.body || {}, 'registeredAmount') ||
+    Object.prototype.hasOwnProperty.call(req.body || {}, 'loanAmount') ||
+    Object.prototype.hasOwnProperty.call(req.body || {}, 'loanTermMonths') ||
+    Object.prototype.hasOwnProperty.call(req.body || {}, 'interestRatePercent')
+  ) {
+    if (!hasAgentPermission(agent, 'loans.editLoan')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
+  }
   if (Object.prototype.hasOwnProperty.call(req.body || {}, 'withdrawCode')) {
     const oldCode = String(oldPayload.withdrawCode || '').trim();
     const nextCode = String(req.body?.withdrawCode || '').trim();
@@ -561,7 +640,7 @@ app.put('/api/agent/applications/:appId', requireAgent, (req, res) => {
   res.json({ application: updated });
 });
 
-app.put('/api/agent/users/:userId/balance', requireAgent, (req, res) => {
+app.put('/api/agent/users/:userId/balance', requireAgent, requireAgentPermission('loans.addSubtract'), (req, res) => {
   const agent = req.agent;
   const { userId } = req.params;
   const user = db.prepare('SELECT id FROM users WHERE id = ? AND agent_id = ?').get(userId, agent.id);
@@ -590,6 +669,30 @@ app.patch('/api/agent/users/:userId', requireAgent, (req, res) => {
   if (!user) {
     res.status(404).json({ message: 'User not found.' });
     return;
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'password')) {
+    if (!hasAgentPermission(agent, 'customers.changePassword')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'inviteCode')) {
+    if (!hasAgentPermission(agent, 'customers.editInviteCode')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'disabledLogin')) {
+    if (!hasAgentPermission(agent, 'customers.disableLogin')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'gender') || Object.prototype.hasOwnProperty.call(req.body || {}, 'phoneOrEmail')) {
+    if (!hasAgentPermission(agent, 'customers.editUser')) {
+      res.status(403).json({ message: 'Permission denied.' });
+      return;
+    }
   }
   const nextGender = String(req.body?.gender || user.gender);
   const nextPhone = String(req.body?.phoneOrEmail || user.phone_or_email).trim();
@@ -678,7 +781,7 @@ app.patch('/api/admin/users/:userId', requireAdmin, (req, res) => {
   });
 });
 
-app.delete('/api/agent/users/:userId', requireAgent, (req, res) => {
+app.delete('/api/agent/users/:userId', requireAgent, requireAgentPermission('customers.deleteUser'), (req, res) => {
   const agent = req.agent;
   const { userId } = req.params;
   const user = db.prepare('SELECT id FROM users WHERE id = ? AND agent_id = ?').get(userId, agent.id);
