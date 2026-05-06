@@ -37,6 +37,8 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
   const [editDraftUser, setEditDraftUser] = useState<User | null>(null);
   const [editDraftApp, setEditDraftApp] = useState<Application | null>(null);
   const [editBalanceInput, setEditBalanceInput] = useState('0');
+  const [userEditOnlyId, setUserEditOnlyId] = useState<string | null>(null);
+  const [userEditOnlyDraft, setUserEditOnlyDraft] = useState<User | null>(null);
   const [docPreview, setDocPreview] = useState<{ title: string; src: string } | null>(null);
   const [statusModalAppId, setStatusModalAppId] = useState<string | null>(null);
   const [statusValue, setStatusValue] = useState<Application['status']>('under_review');
@@ -113,11 +115,25 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     }
   };
 
+  const openUserEditOnly = (userId: string) => {
+    const user = users.find((u) => u.id === userId) || null;
+    if (!user) {
+      setError('User not found.');
+      return;
+    }
+    setUserEditOnlyId(userId);
+    setUserEditOnlyDraft({ ...user });
+  };
+
   const openEdit = (userId: string) => {
     const user = users.find((u) => u.id === userId) || null;
     const app = latestAppByUserId[userId] || null;
-    if (!user || !app) {
-      setError('User or application not found.');
+    if (!user) {
+      setError('User not found.');
+      return;
+    }
+    if (!app) {
+      openUserEditOnly(userId);
       return;
     }
     setEditUserId(userId);
@@ -297,6 +313,28 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
     }
   };
 
+  const saveUserEditOnly = async () => {
+    if (!agentKey || !userEditOnlyId || !userEditOnlyDraft) return;
+    setLoading(true);
+    setError('');
+    try {
+      await agentApi.updateUser(agentKey, userEditOnlyId, {
+        gender: userEditOnlyDraft.gender,
+        phoneOrEmail: userEditOnlyDraft.phoneOrEmail,
+        password: userEditOnlyDraft.password,
+        inviteCode: userEditOnlyDraft.inviteCode,
+        disabledLogin: !!userEditOnlyDraft.disabledLogin,
+      });
+      setUserEditOnlyId(null);
+      setUserEditOnlyDraft(null);
+      await loadOverview(agentKey);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save user.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!agentKey) return;
     loadOverview(agentKey);
@@ -438,7 +476,7 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                   <table className="min-w-[980px] w-full text-left text-sm">
                     <thead className="border-y border-slate-200 bg-white text-slate-700">
                       <tr>
-                        {['ID', 'Date', 'Username', 'Invite Code', 'Balance', 'Withdrawn', 'Status'].map((h) => (
+                        {['ID', 'Date', 'Username', 'Invite Code', 'Balance', 'Withdrawn', 'Status', 'Actions'].map((h) => (
                           <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
                         ))}
                       </tr>
@@ -461,11 +499,11 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                             <td className="px-3 py-2">{app ? statusText : '-'}</td>
                             <td className="px-3 py-2">
                               <div className="flex flex-wrap gap-2">
+                                <Button type="button" className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700" onClick={() => openEdit(u.id)}>
+                                  View/Edit
+                                </Button>
                                 {app && (
                                   <>
-                                    <Button type="button" className="h-8 rounded bg-cyan-600 px-2 text-xs font-bold text-white hover:bg-cyan-700" onClick={() => openEdit(u.id)}>
-                                      Edit
-                                    </Button>
                                     <Button
                                       type="button"
                                       className="h-8 rounded bg-amber-600 px-2 text-xs font-bold text-white hover:bg-amber-700"
@@ -661,6 +699,35 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                 Save
               </Button>
               <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setEditUserId(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!userEditOnlyId && !!userEditOnlyDraft} title="Edit User" onClose={() => setUserEditOnlyId(null)} maxWidthClassName="max-w-xl">
+        {userEditOnlyDraft && (
+          <div className="space-y-4">
+            <Grid2>
+              <EditInput label="Username (Phone/Email)" value={userEditOnlyDraft.phoneOrEmail} onChange={(v) => setUserEditOnlyDraft({ ...userEditOnlyDraft, phoneOrEmail: v })} />
+              <EditInput label="Gender" value={userEditOnlyDraft.gender} onChange={(v) => setUserEditOnlyDraft({ ...userEditOnlyDraft, gender: v as User['gender'] })} />
+              <EditInput label="Password" value={userEditOnlyDraft.password} onChange={(v) => setUserEditOnlyDraft({ ...userEditOnlyDraft, password: v })} />
+              <EditInput label="Invite Code" value={userEditOnlyDraft.inviteCode} onChange={(v) => setUserEditOnlyDraft({ ...userEditOnlyDraft, inviteCode: v })} />
+            </Grid2>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+              <input
+                type="checkbox"
+                checked={!!userEditOnlyDraft.disabledLogin}
+                onChange={(e) => setUserEditOnlyDraft({ ...userEditOnlyDraft, disabledLogin: e.target.checked })}
+              />
+              Disable login
+            </label>
+            <div className="flex gap-2">
+              <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={saveUserEditOnly} disabled={loading}>
+                Save
+              </Button>
+              <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setUserEditOnlyId(null)}>
                 Cancel
               </Button>
             </div>
