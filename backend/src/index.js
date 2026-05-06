@@ -3,6 +3,7 @@ import cors from 'cors';
 import crypto from 'node:crypto';
 import { db, initDb, now } from './db.js';
 import { readPageErrorsConfig, readPageErrorsForUser, writePageErrorsConfig } from './pageErrors.js';
+import { readCreditScore, writeCreditScore } from './creditScore.js';
 
 initDb();
 
@@ -237,6 +238,28 @@ app.get('/api/users/:userId', (req, res) => {
       disabledLogin: Number(user.disabled_login || 0) === 1,
     },
   });
+});
+
+app.get('/api/users/:userId/credit-score', (req, res) => {
+  const { userId } = req.params;
+  const score = readCreditScore(userId);
+  res.json({ creditScore: score == null ? 500 : score });
+});
+
+app.get('/api/admin/users/:userId/credit-score', requireAdmin, (req, res) => {
+  const { userId } = req.params;
+  const score = readCreditScore(userId);
+  res.json({ creditScore: score == null ? 500 : score });
+});
+
+app.put('/api/admin/users/:userId/credit-score', requireAdmin, (req, res) => {
+  const { userId } = req.params;
+  const next = writeCreditScore(userId, req.body?.creditScore);
+  if (next == null) {
+    res.status(400).json({ message: 'Invalid credit score.' });
+    return;
+  }
+  res.json({ ok: true, creditScore: next });
 });
 
 app.put('/api/users/:userId/balance', requireAdmin, (req, res) => {

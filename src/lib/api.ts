@@ -169,6 +169,10 @@ export type AdminPageErrorsResponse = {
   pageErrors: PageErrorsConfig;
 };
 
+export type CreditScoreResponse = {
+  creditScore: number;
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -283,6 +287,16 @@ export const adminApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ pageErrors }),
     }),
+  getCreditScore: (adminPin: string, userId: string) =>
+    request<CreditScoreResponse>(`/api/admin/users/${encodeURIComponent(userId)}/credit-score`, {
+      headers: { 'x-admin-pin': adminPin },
+    }),
+  setCreditScore: (adminPin: string, userId: string, creditScore: number) =>
+    request<{ ok: boolean; creditScore: number }>(`/api/admin/users/${encodeURIComponent(userId)}/credit-score`, {
+      method: 'PUT',
+      headers: { 'x-admin-pin': adminPin },
+      body: JSON.stringify({ creditScore }),
+    }),
 };
 
 export const agentApi = {
@@ -335,6 +349,7 @@ export const applicationsApi = {
 
 export const usersApi = {
   getUser: (userId: string) => request<{ user: ApiUser }>(`/api/users/${encodeURIComponent(userId)}`),
+  getCreditScore: (userId: string) => request<CreditScoreResponse>(`/api/users/${encodeURIComponent(userId)}/credit-score`),
   getBalance: (userId: string) =>
     request<{ balance: { currentBalance: number; withdrawnAmount: number } }>(`/api/users/${encodeURIComponent(userId)}/balance`),
 };

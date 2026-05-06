@@ -1,5 +1,7 @@
 import { CalendarClock, ChevronRight, FileSignature, FileText, Info, LogOut, ScrollText, UserRound } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { getCurrentUser, getLatestApplicationForUser } from '../lib/db';
+import { usersApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 
 type UserProfileProps = {
@@ -20,10 +22,94 @@ const initialsFrom = (name: string) => {
   return s || 'U';
 };
 
+const scoreLabel = (score: number) => {
+  if (score < 580) return 'Fair';
+  if (score < 740) return 'Normal';
+  return 'Good';
+};
+
+const CreditScoreGauge = ({ score }: { score: number }) => {
+  const pct = Math.max(0, Math.min(100, (score / 1000) * 100));
+  const label = scoreLabel(score);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-center">
+        <div className="relative w-full max-w-[320px]">
+          <svg viewBox="0 0 240 140" className="h-auto w-full">
+            <defs>
+              <linearGradient id="scoreGrad" x1="0" y1="0" x2="240" y2="0">
+                <stop offset="0%" stopColor="#ef4444" />
+                <stop offset="45%" stopColor="#f59e0b" />
+                <stop offset="70%" stopColor="#eab308" />
+                <stop offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 30 120 A 90 90 0 0 1 210 120"
+              fill="none"
+              stroke="#e5e7eb"
+              strokeWidth="16"
+              strokeLinecap="round"
+              pathLength={100}
+            />
+            <path
+              d="M 30 120 A 90 90 0 0 1 210 120"
+              fill="none"
+              stroke="url(#scoreGrad)"
+              strokeWidth="16"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray={`${pct} 100`}
+            />
+            <text x="52" y="38" fontSize="14" fill="#f59e0b" fontWeight="700">
+              Fair
+            </text>
+            <text x="108" y="24" fontSize="14" fill="#64748b" fontWeight="700">
+              Normal
+            </text>
+            <text x="178" y="38" fontSize="14" fill="#22c55e" fontWeight="700">
+              Good
+            </text>
+          </svg>
+          <div className="absolute inset-x-0 top-[56px] text-center">
+            <div className="text-5xl font-extrabold text-slate-900">{score}</div>
+            <div className="text-sm font-bold text-slate-600">Credit Score</div>
+            <div className="mt-1 text-xs font-extrabold text-slate-500">{label}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
   const { t } = useI18n();
   const user = getCurrentUser();
   const app = user ? getLatestApplicationForUser(user.id) : null;
+  const [creditScore, setCreditScore] = useState<number>(500);
+  const [creditScoreLoaded, setCreditScoreLoaded] = useState(false);
+  const userId = useMemo(() => user?.id || '', [user?.id]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    usersApi
+      .getCreditScore(userId)
+      .then((res) => {
+        if (!alive) return;
+        const v = Number(res.creditScore);
+        setCreditScore(Number.isFinite(v) ? Math.max(0, Math.min(1000, Math.round(v))) : 500);
+        setCreditScoreLoaded(true);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setCreditScore(500);
+        setCreditScoreLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   if (!user) {
     return (
@@ -59,6 +145,8 @@ export function UserProfile({ onNavigate, onLogout }: UserProfileProps) {
           <div className="mt-1 text-xs font-semibold text-white/80">{user.phoneOrEmail}</div>
         </div>
       </div>
+
+      {creditScoreLoaded && <div className="mt-5"><CreditScoreGauge score={creditScore} /></div>}
 
       <div className="mt-6 space-y-4">
         <button type="button" className={optionRow} onClick={() => onNavigate('my-information')}>

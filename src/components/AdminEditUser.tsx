@@ -32,6 +32,8 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
   const [draftApp, setDraftApp] = useState<Application | null>(null);
   const [draftUser, setDraftUser] = useState<User | null>(null);
   const [balanceInput, setBalanceInput] = useState('0');
+  const [creditScoreInput, setCreditScoreInput] = useState('500');
+  const [creditScoreSaving, setCreditScoreSaving] = useState(false);
   const [docPreview, setDocPreview] = useState<{ title: string; src: string } | null>(null);
 
   const adminLoggedIn = useMemo(() => isAdminLoggedIn(), [refreshKey]);
@@ -74,6 +76,14 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
     setDraftApp({ ...app });
     setDraftUser({ ...user });
     setBalanceInput(String(getUserBalance(app.userId).currentBalance));
+    if (adminPin) {
+      try {
+        const res = await adminApi.getCreditScore(adminPin, user.id);
+        setCreditScoreInput(String(res.creditScore ?? 500));
+      } catch {
+        setCreditScoreInput('500');
+      }
+    }
   };
 
   useEffect(() => {
@@ -129,6 +139,26 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
       .catch((e) => {
         setError(e instanceof Error ? e.message : 'Unable to save changes.');
       });
+  };
+
+  const saveCreditScore = async () => {
+    if (!draftUser) return;
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) {
+      setError('Admin session expired. Please logout and login again.');
+      return;
+    }
+    const next = Number(String(creditScoreInput).replace(/[^\d.]/g, ''));
+    setCreditScoreSaving(true);
+    setError('');
+    try {
+      const res = await adminApi.setCreditScore(adminPin, draftUser.id, next);
+      setCreditScoreInput(String(res.creditScore));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save credit score.');
+    } finally {
+      setCreditScoreSaving(false);
+    }
   };
 
   if (!adminLoggedIn) {
@@ -220,6 +250,48 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
                 <EditInput label="Password" value={draftUser.password} onChange={(v) => setDraftUser({ ...draftUser, password: v })} />
                 <EditInput label="Invite Code" value={draftUser.inviteCode} onChange={(v) => setDraftUser({ ...draftUser, inviteCode: v })} />
               </Grid2>
+            </Box>
+
+            <Box title="Credit Score">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <div className="mb-1 text-xs font-bold text-slate-700">Score (0 - 1000)</div>
+                  <input
+                    value={creditScoreInput}
+                    onChange={(e) => setCreditScoreInput(e.target.value.replace(/[^\d]/g, '').slice(0, 4))}
+                    className={field}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 flex-1 rounded text-xs font-extrabold"
+                    onClick={() => setCreditScoreInput((v) => String(Math.max(0, (Number(v) || 0) - 10)))}
+                  >
+                    -10
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 flex-1 rounded text-xs font-extrabold"
+                    onClick={() => setCreditScoreInput((v) => String(Math.min(1000, (Number(v) || 0) + 10)))}
+                  >
+                    +10
+                  </Button>
+                </div>
+              </div>
+              <div className="pt-3">
+                <Button
+                  type="button"
+                  className="h-9 rounded bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={creditScoreSaving}
+                  onClick={saveCreditScore}
+                >
+                  {creditScoreSaving ? 'Saving…' : 'Update Score'}
+                </Button>
+              </div>
             </Box>
 
             <Box title="KYC Pictures">
