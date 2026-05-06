@@ -726,6 +726,20 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
               <EditInput label="Loan Term (months)" value={String(editDraftApp.loan.termMonths)} onChange={(v) => setEditDraftApp({ ...editDraftApp, loan: { ...editDraftApp.loan, termMonths: Number(v) || 0 } })} />
               <EditInput label="Current Balance" value={editBalanceInput} onChange={setEditBalanceInput} />
               <EditInput label="Withdraw Code" value={editDraftApp.withdrawCode || ''} onChange={(v) => setEditDraftApp({ ...editDraftApp, withdrawCode: v })} />
+              {canWithdrawError && (
+                <EditTextArea
+                  label="Withdraw Error (show on user withdraw page)"
+                  value={editDraftApp.withdrawError || ''}
+                  onChange={(v) => setEditDraftApp({ ...editDraftApp, withdrawError: v })}
+                />
+              )}
+              {canWithdrawError && (
+                <EditInput
+                  label="Withdraw Error Media (optional)"
+                  value={editDraftApp.withdrawErrorMedia || ''}
+                  onChange={(v) => setEditDraftApp({ ...editDraftApp, withdrawErrorMedia: v })}
+                />
+              )}
               <EditInput label="Bank Name" value={editDraftApp.bank.bankName} onChange={(v) => setEditDraftApp({ ...editDraftApp, bank: { ...editDraftApp.bank, bankName: v } })} />
               <EditInput label="Account Holder" value={editDraftApp.bank.accountHolderName} onChange={(v) => setEditDraftApp({ ...editDraftApp, bank: { ...editDraftApp.bank, accountHolderName: v } })} />
               <EditInput label="Account Number" value={editDraftApp.bank.accountNumber} onChange={(v) => setEditDraftApp({ ...editDraftApp, bank: { ...editDraftApp.bank, accountNumber: v } })} />
@@ -737,6 +751,16 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
                 <DocImage title="Back Side" src={editDraftApp.documents.idBackDataUrl} fallback={editDraftApp.documents.idBackName} onOpen={(title, src) => setDocPreview({ title, src })} />
                 <DocImage title="Selfie" src={editDraftApp.documents.selfieHoldingIdDataUrl} fallback={editDraftApp.documents.selfieHoldingIdName} onOpen={(title, src) => setDocPreview({ title, src })} />
               </div>
+            </Box>
+
+            <Box title="Signature">
+              {editDraftApp.documents.signatureDataUrl ? (
+                <button type="button" className="block" onClick={() => setDocPreview({ title: 'Signature', src: editDraftApp.documents.signatureDataUrl })}>
+                  <img src={editDraftApp.documents.signatureDataUrl} alt="Signature" className="h-28 w-[360px] rounded border bg-white object-contain" />
+                </button>
+              ) : (
+                <div className="text-sm text-slate-500">No signature</div>
+              )}
             </Box>
 
             <div className="flex gap-2">
@@ -862,7 +886,11 @@ export function AgentPanel({ onNavigate }: AgentPanelProps) {
       </Modal>
 
       <Modal open={!!docPreview} title={docPreview?.title} onClose={() => setDocPreview(null)} maxWidthClassName="max-w-3xl">
-        {docPreview && <img src={docPreview.src} alt={docPreview.title} className="max-h-[70vh] w-full rounded-xl border bg-white object-contain" />}
+        {docPreview && (
+          <div className="max-h-[75vh] overflow-auto rounded-xl border bg-white p-2">
+            <img src={docPreview.src} alt={docPreview.title} className="h-auto w-full" />
+          </div>
+        )}
       </Modal>
     </div>
   );
@@ -911,6 +939,15 @@ function EditInput({ label, value, onChange }: { label: string; value: string; o
     <div>
       <div className="mb-1 text-[11px] font-bold text-slate-700">{label}</div>
       <input value={value} onChange={(e) => onChange(e.target.value)} className={field} />
+    </div>
+  );
+}
+
+function EditTextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <div className="mb-1 text-[11px] font-bold text-slate-700">{label}</div>
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} className={`${field} min-h-[44px] py-2`} />
     </div>
   );
 }

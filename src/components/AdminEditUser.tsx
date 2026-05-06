@@ -348,7 +348,11 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
       </div>
 
       <Modal open={!!docPreview} title={docPreview?.title} onClose={() => setDocPreview(null)} maxWidthClassName="max-w-3xl">
-        {docPreview && <img src={docPreview.src} alt={docPreview.title} className="max-h-[70vh] w-full rounded-xl border bg-white object-contain" />}
+        {docPreview && (
+          <div className="max-h-[75vh] overflow-auto rounded-xl border bg-white p-2">
+            <img src={docPreview.src} alt={docPreview.title} className="h-auto w-full" />
+          </div>
+        )}
       </Modal>
     </div>
   );
