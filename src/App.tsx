@@ -377,7 +377,7 @@ function App() {
 
   const currentPageError = pageErrors[currentView];
   const pageErrorText =
-    currentView !== 'admin' && currentView !== 'agent' && currentView !== 'admin-edit' && currentPageError?.enabled
+    currentView !== 'admin' && currentView !== 'admin-edit' && currentPageError?.enabled
       ? String(currentPageError.message || '').trim()
       : '';
   const activePageErrorKey = pageErrorText ? `${currentView}:${pageErrorText}` : '';
