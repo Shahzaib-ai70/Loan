@@ -39,6 +39,11 @@ const CreditScoreGauge = ({ score }: { score: number }) => {
   const ny = cy - Math.sin(a) * needleLen;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-2 flex items-center justify-between px-1 text-xs font-extrabold">
+        <div className="text-[#f59e0b]">Fair</div>
+        <div className="text-slate-500">Normal</div>
+        <div className="text-[#22c55e]">Good</div>
+      </div>
       <div className="flex items-center justify-center">
         <div className="relative w-full max-w-[320px]">
           <svg viewBox="0 0 240 140" className="h-auto w-full">
@@ -70,16 +75,6 @@ const CreditScoreGauge = ({ score }: { score: number }) => {
             <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
             <circle cx={cx} cy={cy} r="6" fill="#0f172a" />
             <circle cx={cx} cy={cy} r="3" fill="#ffffff" opacity="0.9" />
-
-            <text x="50" y="54" fontSize="14" fill="#f59e0b" fontWeight="700" textAnchor="middle">
-              Fair
-            </text>
-            <text x="120" y="22" fontSize="14" fill="#64748b" fontWeight="700" textAnchor="middle">
-              Normal
-            </text>
-            <text x="190" y="54" fontSize="14" fill="#22c55e" fontWeight="700" textAnchor="middle">
-              Good
-            </text>
           </svg>
           <div className="absolute inset-x-0 top-[56px] text-center">
             <div className="text-5xl font-extrabold text-slate-900">{score}</div>
