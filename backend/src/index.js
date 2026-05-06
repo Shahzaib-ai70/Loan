@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { db, initDb, now } from './db.js';
 import { readPageErrorsConfig, readPageErrorsForUser, writePageErrorsConfig } from './pageErrors.js';
 import { readCreditScore, writeCreditScore } from './creditScore.js';
-import { readAgentPermissionFor, writeAgentPermissionFor } from './agentPermissions.js';
+import { deleteAgentPermissionFor, readAgentPermissionFor, writeAgentPermissionFor } from './agentPermissions.js';
 
 initDb();
 
@@ -540,6 +540,23 @@ app.put('/api/admin/agents/:agentId/permissions', requireAdmin, (req, res) => {
   }
   writeAgentPermissionFor(agentId, permissions);
   res.json({ ok: true, permissions: readAgentPermissionFor(agentId) || {} });
+});
+
+app.delete('/api/admin/agents/:agentId', requireAdmin, (req, res) => {
+  const agentId = String(req.params.agentId || '').trim();
+  if (!agentId) {
+    res.status(400).json({ message: 'agentId is required.' });
+    return;
+  }
+  const exists = db.prepare('SELECT id FROM agents WHERE id = ?').get(agentId);
+  if (!exists) {
+    res.status(404).json({ message: 'Agent not found.' });
+    return;
+  }
+  db.prepare('UPDATE users SET agent_id = NULL WHERE agent_id = ?').run(agentId);
+  db.prepare('DELETE FROM agents WHERE id = ?').run(agentId);
+  deleteAgentPermissionFor(agentId);
+  res.json({ ok: true });
 });
 
 app.get('/api/agent/overview', requireAgent, (req, res) => {

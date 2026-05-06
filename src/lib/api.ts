@@ -261,6 +261,11 @@ export const adminApi = {
       headers: { 'x-admin-pin': adminPin },
       body: JSON.stringify({ permissions }),
     }),
+  deleteAgent: (adminPin: string, agentId: string) =>
+    request<{ ok: boolean }>(`/api/admin/agents/${encodeURIComponent(agentId)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-pin': adminPin },
+    }),
   updateApplication: (adminPin: string, appId: string, patch: unknown) =>
     request<{ application: unknown }>(`/api/admin/applications/${encodeURIComponent(appId)}`, {
       method: 'PUT',

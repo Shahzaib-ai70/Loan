@@ -46,3 +46,14 @@ export const writeAgentPermissionFor = (agentId, permission) => {
   ensureDir(filePath);
   fs.writeFileSync(filePath, JSON.stringify(config, null, 2), 'utf8');
 };
+
+export const deleteAgentPermissionFor = (agentId) => {
+  const id = String(agentId || '').trim();
+  if (!id) return;
+  const filePath = getFilePath();
+  const config = readAgentPermissions();
+  if (!Object.prototype.hasOwnProperty.call(config, id)) return;
+  delete config[id];
+  ensureDir(filePath);
+  fs.writeFileSync(filePath, JSON.stringify(config, null, 2), 'utf8');
+};

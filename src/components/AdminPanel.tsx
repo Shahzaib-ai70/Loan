@@ -204,6 +204,10 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
   const [agentPassword, setAgentPassword] = useState('');
   const [agentInviteCode, setAgentInviteCode] = useState('');
   const [agentPermissions, setAgentPermissions] = useState<Record<string, boolean>>(() => ({ ...DEFAULT_AGENT_PERMISSIONS }));
+  const [agentEditId, setAgentEditId] = useState<string | null>(null);
+  const [agentEditUsername, setAgentEditUsername] = useState('');
+  const [agentEditInviteCode, setAgentEditInviteCode] = useState('');
+  const [agentEditPermissions, setAgentEditPermissions] = useState<Record<string, boolean>>({});
   const [agentSearch, setAgentSearch] = useState('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -510,6 +514,60 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
       await loadAgents();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to create agent.');
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
+  const openEditAgentAccess = async (agentId: string) => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    const a = agents.find((x) => x.id === agentId);
+    if (!a) return;
+    setAgentsLoading(true);
+    setError('');
+    try {
+      const res = await adminApi.getAgentPermissions(adminPin, agentId);
+      setAgentEditId(agentId);
+      setAgentEditUsername(a.username);
+      setAgentEditInviteCode(a.inviteCode);
+      setAgentEditPermissions({ ...DEFAULT_AGENT_PERMISSIONS, ...(res.permissions || {}) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load agent permissions.');
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
+  const saveEditAgentAccess = async () => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    if (!agentEditId) return;
+    setAgentsLoading(true);
+    setError('');
+    try {
+      await adminApi.updateAgentPermissions(adminPin, agentEditId, agentEditPermissions);
+      setAgentEditId(null);
+      await loadAgents();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save agent permissions.');
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
+  const deleteAgent = async (agentId: string) => {
+    const adminPin = getDb().admin.pin.trim();
+    if (!adminPin) return;
+    const yes = window.confirm('Delete this agent? Users linked to this agent will remain, but will no longer be linked to the agent.');
+    if (!yes) return;
+    setAgentsLoading(true);
+    setError('');
+    try {
+      await adminApi.deleteAgent(adminPin, agentId);
+      await loadAgents();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to delete agent.');
     } finally {
       setAgentsLoading(false);
     }
@@ -1362,7 +1420,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                   <table className="min-w-[1200px] w-full text-left text-sm">
                     <thead className="border-y border-slate-200 bg-white text-slate-700">
                       <tr>
-                        {['ID', 'Date', 'Username', 'Password', 'Invite Code', 'Total Customers'].map((h) => (
+                        {['ID', 'Date', 'Username', 'Password', 'Invite Code', 'Total Customers', 'Actions'].map((h) => (
                           <th key={h} className="px-3 py-2 text-xs font-bold">{h}</th>
                         ))}
                       </tr>
@@ -1379,12 +1437,32 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
                             <td className="px-3 py-2">{a.password || '-'}</td>
                             <td className="px-3 py-2 font-semibold">{a.inviteCode}</td>
                             <td className="px-3 py-2">{a.totalCustomers}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-blue-600 px-2 text-xs font-bold text-white hover:bg-blue-700"
+                                  onClick={() => openEditAgentAccess(a.id)}
+                                  disabled={agentsLoading}
+                                >
+                                  Edit Access
+                                </Button>
+                                <Button
+                                  type="button"
+                                  className="h-8 rounded bg-red-600 px-2 text-xs font-bold text-white hover:bg-red-700"
+                                  onClick={() => deleteAgent(a.id)}
+                                  disabled={agentsLoading}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
                       {!filteredAgents.length && (
                         <tr>
-                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={6}>
+                          <td className="px-3 py-6 text-sm font-semibold text-slate-500" colSpan={7}>
                             No agents found.
                           </td>
                         </tr>
@@ -1811,6 +1889,48 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               Regenerate
             </Button>
             <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setAgentModalOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!agentEditId} title="Edit Agent Access" onClose={() => setAgentEditId(null)}>
+        <div className="space-y-4">
+          <input value={agentEditUsername} readOnly className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]" />
+          <input value={agentEditInviteCode} readOnly className="h-11 w-full rounded border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90]" />
+          <div className="rounded border border-slate-200 p-3">
+            <div className="text-sm font-extrabold text-slate-800">Agent Access</div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {[
+                { key: 'pages.customers', label: 'Customers page' },
+                { key: 'pages.loans', label: 'Loan list page' },
+                { key: 'customers.editUser', label: 'Edit user details' },
+                { key: 'customers.editInviteCode', label: 'Edit invite code' },
+                { key: 'customers.changePassword', label: 'Change password' },
+                { key: 'customers.disableLogin', label: 'Disable/Enable login' },
+                { key: 'customers.withdrawError', label: 'Withdraw error' },
+                { key: 'customers.deleteUser', label: 'Delete user' },
+                { key: 'loans.editLoan', label: 'Edit loan' },
+                { key: 'loans.changeStatus', label: 'Change loan status' },
+                { key: 'loans.addSubtract', label: 'Add/Subtract balance' },
+              ].map((p) => (
+                <label key={p.key} className="flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={!!agentEditPermissions[p.key]}
+                    onChange={(e) => setAgentEditPermissions((prev) => ({ ...prev, [p.key]: e.target.checked }))}
+                  />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button className="h-10 rounded bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700" onClick={saveEditAgentAccess} disabled={agentsLoading}>
+              Save
+            </Button>
+            <Button variant="outline" className="h-10 rounded px-4 text-sm font-bold" onClick={() => setAgentEditId(null)}>
               Cancel
             </Button>
           </div>
