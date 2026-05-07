@@ -25,8 +25,7 @@ const card = 'rounded-sm border border-slate-200 bg-white';
 const field = 'h-9 w-full rounded border border-slate-300 px-2 text-xs outline-none focus:border-[#0b4a90]';
 
 export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('');
+  const [pinLogin, setPinLogin] = useState('');
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [draftApp, setDraftApp] = useState<Application | null>(null);
@@ -95,10 +94,15 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
     e.preventDefault();
     setError('');
     try {
-      const res = await adminApi.login({ username, password });
+      const p = pinLogin.trim();
+      if (p.length !== 6) {
+        setError('PIN is required.');
+        return;
+      }
+      const res = await adminApi.login({ pin: p });
       setAdminPin(res.adminPin);
       setAdminSession(true);
-      setPassword('');
+      setPinLogin('');
       setRefreshKey((x) => x + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid admin login.');
@@ -174,16 +178,9 @@ export function AdminEditUser({ appId, onBack }: AdminEditUserProps) {
           )}
           <form className="mt-6 space-y-4" onSubmit={login}>
             <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              type="password"
+              value={pinLogin}
+              onChange={(e) => setPinLogin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="Enter 6-digit PIN"
               className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
             />
             <Button type="submit" className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">
