@@ -152,7 +152,8 @@ const normalizePageErrorsConfig = (raw: unknown): PageErrorsConfig => {
 };
 
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
-  const [pinLogin, setPinLogin] = useState('');
+  const [username, setUsername] = useState('Shahzaib');
+  const [password, setPassword] = useState('');
   const { showCurrencySign, currencySymbol, setShowCurrencySign, setCurrencySymbol } = useCurrency();
   const [operatorName, setOperatorName] = useState(() => {
     try {
@@ -574,24 +575,23 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     e.preventDefault();
     setError('');
     if (loginLoading) return;
-    const p = pinLogin.trim();
-    if (p.length !== 6) {
-      setError('PIN is required.');
+    if (!username.trim() || !password) {
+      setError('Username and password are required.');
       return;
     }
     setLoginLoading(true);
     try {
-      const res = await adminApi.login({ pin: p });
+      const res = await adminApi.login({ username, password });
       setAdminPin(res.adminPin);
       setAdminSession(true);
       setRefreshKey((x) => x + 1);
       try {
-        const nextOp = 'Admin';
+        const nextOp = username.trim() || 'Admin';
         localStorage.setItem(OPERATOR_NAME_KEY, nextOp);
         setOperatorName(nextOp);
       } catch {
       }
-      setPinLogin('');
+      setPassword('');
       await syncFromServer(res.adminPin);
       await loadAgents();
     } catch (e) {
@@ -850,9 +850,16 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
           )}
           <form className="mt-6 space-y-4" onSubmit={login}>
             <input
-              value={pinLogin}
-              onChange={(e) => setPinLogin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="Enter 6-digit PIN"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
+              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              type="password"
               className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
             />
             <Button type="submit" className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">

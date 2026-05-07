@@ -19,9 +19,18 @@ app.use(express.json({ limit: '10mb' }));
 const normalize = (s) => String(s || '').trim().toLowerCase();
 const makeId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
+const getEnvAdminCredentials = () => {
+  const username = String(process.env.ADMIN_USERNAME || '').trim();
+  const password = String(process.env.ADMIN_PASSWORD || '').trim();
+  if (!username || !password) return null;
+  return { username, password };
+};
+
 const getAdminPin = () => {
-  const envPin = String(process.env.ADMIN_PIN || '').trim();
-  if (envPin) return envPin;
+  const env = getEnvAdminCredentials();
+  if (env) {
+    return crypto.createHash('sha256').update(`${env.username}:${env.password}`).digest('hex');
+  }
   const row = db.prepare('SELECT pin FROM admin_settings WHERE id = 1').get();
   return row?.pin || '123456';
 };
@@ -43,6 +52,11 @@ const getAppSettings = () => {
 };
 
 const verifyAdminPassword = (username, password) => {
+  const env = getEnvAdminCredentials();
+  if (env) {
+    if (normalize(username) !== normalize(env.username)) return false;
+    return String(password || '') === env.password;
+  }
   const creds = getAdminCredentials();
   if (!creds.passwordSalt || !creds.passwordHash) return false;
   if (String(username || '').trim().toLowerCase() !== String(creds.username || '').trim().toLowerCase()) return false;
@@ -349,17 +363,16 @@ app.post('/api/withdraw', (req, res) => {
 });
 
 app.post('/api/admin/login', (req, res) => {
-  const { pin = '' } = req.body || {};
-  const p = String(pin || '').trim();
-  if (!p) {
-    res.status(400).json({ message: 'PIN is required.' });
+  const { username = '', password = '' } = req.body || {};
+  if (!String(username || '').trim() || !String(password || '').trim()) {
+    res.status(400).json({ message: 'Username and password are required.' });
     return;
   }
-  if (p !== getAdminPin()) {
-    res.status(401).json({ message: 'Invalid admin pin.' });
+
+  if (!verifyAdminPassword(username, password)) {
+    res.status(401).json({ message: 'Invalid admin login.' });
     return;
   }
-  res.json({ ok: true, adminPin: p });
   res.json({ ok: true, adminPin: getAdminPin() });
 
 app.post('/api/agent/login', (req, res) => {
