@@ -20,8 +20,10 @@ const normalize = (s) => String(s || '').trim().toLowerCase();
 const makeId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 const getAdminPin = () => {
+  const envPin = String(process.env.ADMIN_PIN || '').trim();
+  if (envPin) return envPin;
   const row = db.prepare('SELECT pin FROM admin_settings WHERE id = 1').get();
-  return row?.pin || '123456';
+  return row?.pin || '568367';
 };
 
 const getAdminCredentials = () => {
