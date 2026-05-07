@@ -7,27 +7,12 @@ type AdminSupportChatProps = {
 };
 
 export function AdminSupportChat({ adminPin }: AdminSupportChatProps) {
-  const SUPPORT_UNLOCK_KEY = 'take_easy_loan_support_chat_unlocked_v1';
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
-  const [unlocked, setUnlocked] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem(SUPPORT_UNLOCK_KEY);
-      if (!raw) return false;
-      const parsed = JSON.parse(raw) as { unlockedAt?: number };
-      const ts = Number(parsed?.unlockedAt || 0);
-      if (!ts) return false;
-      return Date.now() - ts < 1000 * 60 * 60 * 6;
-    } catch {
-      return false;
-    }
-  });
-  const [unlockInput, setUnlockInput] = useState('');
-  const [unlockError, setUnlockError] = useState('');
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [assigning, setAssigning] = useState(false);
   const [deletingThread, setDeletingThread] = useState(false);
@@ -48,7 +33,6 @@ export function AdminSupportChat({ adminPin }: AdminSupportChatProps) {
   );
 
   const loadThreads = useCallback(async () => {
-    if (!unlocked) return;
     try {
       const res = await chatApi.adminGetThreads(adminPin);
       setThreads(res.threads);
@@ -57,10 +41,9 @@ export function AdminSupportChat({ adminPin }: AdminSupportChatProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load chat threads.');
     }
-  }, [adminPin, unlocked]);
+  }, [adminPin]);
 
   const loadMessages = useCallback(async () => {
-    if (!unlocked) return;
     if (!selectedUserId) return;
     try {
       const res = await chatApi.adminGetMessages(adminPin, selectedUserId);
@@ -69,33 +52,29 @@ export function AdminSupportChat({ adminPin }: AdminSupportChatProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load messages.');
     }
-  }, [adminPin, selectedUserId, unlocked]);
+  }, [adminPin, selectedUserId]);
 
   useEffect(() => {
-    if (!unlocked) return;
     loadThreads();
     const id = window.setInterval(loadThreads, 2500);
     return () => window.clearInterval(id);
-  }, [loadThreads, unlocked]);
+  }, [loadThreads]);
 
   useEffect(() => {
-    if (!unlocked) return;
     supportApi
       .adminGetSettings(adminPin)
       .then((r) => setSettings(r.settings))
       .catch(() => {});
-  }, [adminPin, unlocked]);
+  }, [adminPin]);
 
   useEffect(() => {
-    if (!unlocked) return;
     adminApi
       .getAgents(adminPin)
       .then((r) => setAgents(r.agents || []))
       .catch(() => {});
-  }, [adminPin, unlocked]);
+  }, [adminPin]);
 
   useEffect(() => {
-    if (!unlocked) return;
     loadMessages();
     if (!selectedUserId) return;
     const id = window.setInterval(loadMessages, 1500);
@@ -125,81 +104,6 @@ export function AdminSupportChat({ adminPin }: AdminSupportChatProps) {
       setSending(false);
     }
   }, [adminPin, loadMessages, loadThreads, selectedUserId, text]);
-
-  if (!unlocked) {
-    return (
-      <div className="rounded-sm border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-[#0b4a90]" />
-            <div className="text-lg font-extrabold text-slate-900">Customer Service</div>
-          </div>
-        </div>
-        <div className="p-6">
-          <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-lg font-extrabold text-slate-900">Unlock Live Chat</div>
-            <div className="mt-1 text-sm font-semibold text-slate-600">Enter Admin PIN to open chat conversations.</div>
-            {(unlockError || error) && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                {unlockError || error}
-              </div>
-            )}
-            <div className="mt-4 space-y-3">
-              <input
-                value={unlockInput}
-                onChange={(e) => setUnlockInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm font-semibold outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
-                placeholder="6-digit PIN"
-                inputMode="numeric"
-                type="password"
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter') return;
-                  setUnlockError('');
-                  if (!unlockInput.trim()) {
-                    setUnlockError('Enter Admin PIN.');
-                    return;
-                  }
-                  if (unlockInput.trim() !== adminPin) {
-                    setUnlockError('Invalid Admin PIN.');
-                    return;
-                  }
-                  try {
-                    sessionStorage.setItem(SUPPORT_UNLOCK_KEY, JSON.stringify({ unlockedAt: Date.now() }));
-                  } catch {
-                  }
-                  setUnlocked(true);
-                  setUnlockInput('');
-                }}
-              />
-              <button
-                type="button"
-                className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]"
-                onClick={() => {
-                  setUnlockError('');
-                  if (!unlockInput.trim()) {
-                    setUnlockError('Enter Admin PIN.');
-                    return;
-                  }
-                  if (unlockInput.trim() !== adminPin) {
-                    setUnlockError('Invalid Admin PIN.');
-                    return;
-                  }
-                  try {
-                    sessionStorage.setItem(SUPPORT_UNLOCK_KEY, JSON.stringify({ unlockedAt: Date.now() }));
-                  } catch {
-                  }
-                  setUnlocked(true);
-                  setUnlockInput('');
-                }}
-              >
-                Unlock
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="rounded-sm border border-slate-200 bg-white">
