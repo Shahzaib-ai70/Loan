@@ -152,8 +152,10 @@ const normalizePageErrorsConfig = (raw: unknown): PageErrorsConfig => {
 };
 
 export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
-  const [username, setUsername] = useState('Shahzaib');
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
+  const [loginMode, setLoginMode] = useState<'password' | 'pin'>('password');
+  const [pinLogin, setPinLogin] = useState('');
   const { showCurrencySign, currencySymbol, setShowCurrencySign, setCurrencySymbol } = useCurrency();
   const [operatorName, setOperatorName] = useState(() => {
     try {
@@ -575,23 +577,35 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     e.preventDefault();
     setError('');
     if (loginLoading) return;
-    if (!username.trim() || !password) {
-      setError('Username and password are required.');
-      return;
+    if (loginMode === 'pin') {
+      const p = pinLogin.trim();
+      if (p.length !== 6) {
+        setError('PIN is required.');
+        return;
+      }
+    } else {
+      if (!username.trim() || !password) {
+        setError('Username and password are required.');
+        return;
+      }
     }
     setLoginLoading(true);
     try {
-      const res = await adminApi.login({ username, password });
+      const res =
+        loginMode === 'pin'
+          ? await adminApi.login({ pin: pinLogin.trim() })
+          : await adminApi.login({ username, password });
       setAdminPin(res.adminPin);
       setAdminSession(true);
       setRefreshKey((x) => x + 1);
       try {
-        const nextOp = username.trim() || 'Admin';
+        const nextOp = loginMode === 'password' ? username.trim() || 'Admin' : 'Admin';
         localStorage.setItem(OPERATOR_NAME_KEY, nextOp);
         setOperatorName(nextOp);
       } catch {
       }
       setPassword('');
+      setPinLogin('');
       await syncFromServer(res.adminPin);
       await loadAgents();
     } catch (e) {
@@ -849,19 +863,49 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             </div>
           )}
           <form className="mt-6 space-y-4" onSubmit={login}>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              type="password"
-              className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={loginMode === 'password' ? 'primary' : 'outline'}
+                className={loginMode === 'password' ? 'h-10 w-full bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]' : 'h-10 w-full text-sm font-extrabold'}
+                onClick={() => setLoginMode('password')}
+              >
+                Username/Password
+              </Button>
+              <Button
+                type="button"
+                variant={loginMode === 'pin' ? 'primary' : 'outline'}
+                className={loginMode === 'pin' ? 'h-10 w-full bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]' : 'h-10 w-full text-sm font-extrabold'}
+                onClick={() => setLoginMode('pin')}
+              >
+                PIN
+              </Button>
+            </div>
+
+            {loginMode === 'password' ? (
+              <>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Username"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+                />
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  type="password"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+                />
+              </>
+            ) : (
+              <input
+                value={pinLogin}
+                onChange={(e) => setPinLogin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter 6-digit PIN"
+                className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
+              />
+            )}
             <Button type="submit" className="h-11 w-full rounded-lg bg-[#0b4a90] text-sm font-extrabold text-white hover:bg-[#093b74]">
               Login
             </Button>
