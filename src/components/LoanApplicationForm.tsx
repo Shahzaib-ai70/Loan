@@ -344,7 +344,7 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
       </section>
 
       <footer className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-1">
           <div>
             <h4 className="text-lg font-extrabold text-slate-900">{t('register.supportTitle')}</h4>
             <ul className="mt-3 space-y-2">
@@ -356,14 +356,6 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="rounded-xl bg-[#f8fbff] p-5 ring-1 ring-slate-200">
-            <div className="text-xs font-extrabold tracking-wide text-[#0b4a90]">{t('register.hotline')}</div>
-            <div className="mt-1 text-2xl font-extrabold text-slate-900">+1 773 322 9624</div>
-            <button className="mt-4 inline-flex items-center gap-2 rounded-md bg-[#e21b23] px-4 py-2 text-sm font-extrabold text-white hover:bg-[#c9161d]">
-              <LockKeyhole className="h-4 w-4" />
-              {t('register.electronicBanking')}
-            </button>
           </div>
         </div>
       </footer>
