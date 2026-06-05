@@ -277,7 +277,7 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                     className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0b4a90]"
                   />
                   <div className="mt-2 text-right text-sm font-extrabold text-[#0b4a90]">
-                    {currencySymbol}{loanAmount.toLocaleString()}
+                    {showCurrencySign ? currencySymbol : ''}{loanAmount.toLocaleString()}
                   </div>
                 </div>
 
@@ -319,7 +319,7 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                 <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-[#eaf2ff] to-white border border-[#0b4a90]/20">
                   <div className="text-sm font-semibold text-slate-600">Monthly Installment</div>
                   <div className="mt-1 text-3xl font-extrabold text-[#0b4a90]">
-                    {currencySymbol}{monthlyInstallment.toFixed(2)}
+                    {showCurrencySign ? currencySymbol : ''}{monthlyInstallment.toFixed(2)}
                   </div>
                 </div>
               </div>
