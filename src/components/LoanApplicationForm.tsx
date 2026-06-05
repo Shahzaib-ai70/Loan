@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CheckCircle2, ChevronRight, LockKeyhole, Smartphone } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Smartphone } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './Modal';
 import { authApi } from '../lib/api';
