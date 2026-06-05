@@ -13,7 +13,7 @@ const LANGUAGE_KEY = 'take_easy_loan_language';
 const detectLanguage = (): Language => {
   try {
     const stored = localStorage.getItem(LANGUAGE_KEY);
-    if (stored === 'en' || stored === 'fr' || stored === 'es' || stored === 'pt-BR' || stored === 'de') return stored;
+    if (stored === 'en' || stored === 'fr' || stored === 'es' || stored === 'pt-BR' || stored === 'de' || stored === 'sq') return stored;
   } catch {
   }
   const nav = (navigator.languages?.[0] || navigator.language || '').toLowerCase();
@@ -21,6 +21,7 @@ const detectLanguage = (): Language => {
   if (nav.startsWith('es')) return 'es';
   if (nav === 'pt-br' || nav.startsWith('pt')) return 'pt-BR';
   if (nav.startsWith('de')) return 'de';
+  if (nav.startsWith('sq')) return 'sq';
   return 'en';
 };
 
