@@ -43,6 +43,21 @@ type Slide = {
 export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
   const { t } = useI18n();
   const { showCurrencySign, currencySymbol } = useCurrency();
+
+  // Loan Calculator State
+  const [loanAmount, setLoanAmount] = useState(10000);
+  const [loanTerm, setLoanTerm] = useState(12); // months
+  const [interestRate, setInterestRate] = useState(6.99); // annual percentage
+
+  // Calculate Monthly Installment
+  const monthlyInstallment = useMemo(() => {
+    if (loanAmount <= 0 || loanTerm <= 0 || interestRate <= 0) return 0;
+    const monthlyRate = interestRate / 100 / 12;
+    const n = loanTerm;
+    const emi = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+    return emi;
+  }, [loanAmount, loanTerm, interestRate]);
+
   const slides = useMemo<Slide[]>(
     () => [
       {
@@ -217,14 +232,6 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
-            <div className="overflow-hidden rounded-2xl bg-slate-100">
-              <img
-                src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1600"
-                alt=""
-                className="h-56 w-full object-cover sm:h-72"
-              />
-            </div>
-
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-[#0b4a90] sm:text-xl">{t('home.personalLoan.headline')}</h3>
               <p className="text-sm leading-6 text-slate-600 sm:text-base">
@@ -247,6 +254,72 @@ export function LoanLandingPage({ onNavigate }: LoanLandingPageProps) {
                   <div className="text-xs font-semibold text-slate-500">{t('home.personalLoan.amountLabel')}</div>
                   <div className="mt-1 text-lg font-extrabold text-slate-900">
                     {t('home.personalLoan.amountValue', { amount: formatCompactMoney(100000, showCurrencySign, currencySymbol) })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Loan Calculator */}
+            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+              <h4 className="text-lg font-extrabold text-slate-900 mb-4">Loan Calculator</h4>
+              
+              <div className="space-y-4">
+                {/* Loan Amount */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Loan Amount</label>
+                  <input
+                    type="range"
+                    min="1000"
+                    max="500000"
+                    step="1000"
+                    value={loanAmount}
+                    onChange={(e) => setLoanAmount(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0b4a90]"
+                  />
+                  <div className="mt-2 text-right text-sm font-extrabold text-[#0b4a90]">
+                    {currencySymbol}{loanAmount.toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Loan Term */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Loan Term (Months)</label>
+                  <input
+                    type="range"
+                    min="3"
+                    max="60"
+                    step="1"
+                    value={loanTerm}
+                    onChange={(e) => setLoanTerm(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0b4a90]"
+                  />
+                  <div className="mt-2 text-right text-sm font-extrabold text-[#0b4a90]">
+                    {loanTerm} Months
+                  </div>
+                </div>
+
+                {/* Interest Rate */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Interest Rate (%)</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="15"
+                    step="0.01"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0b4a90]"
+                  />
+                  <div className="mt-2 text-right text-sm font-extrabold text-[#0b4a90]">
+                    {interestRate.toFixed(2)}%
+                  </div>
+                </div>
+
+                {/* Monthly Installment */}
+                <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-[#eaf2ff] to-white border border-[#0b4a90]/20">
+                  <div className="text-sm font-semibold text-slate-600">Monthly Installment</div>
+                  <div className="mt-1 text-3xl font-extrabold text-[#0b4a90]">
+                    {currencySymbol}{monthlyInstallment.toFixed(2)}
                   </div>
                 </div>
               </div>
