@@ -1,9 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { CheckCircle2, ChevronRight, Smartphone } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Modal } from './Modal';
 import { authApi } from '../lib/api';
-import { getSession, setSession, upsertUser, type Gender } from '../lib/db';
+import { setSession, upsertUser, type Gender } from '../lib/db';
 import { useI18n } from '../lib/i18n';
 
 type RegisterFormData = {
@@ -26,8 +25,6 @@ const SUPPORT_LINK_KEYS = [
   'register.support.feeSchedule',
 ] as const;
 
-const TERMS_ACCEPTED_KEY_PREFIX = 'take_easy_loan_terms_accepted_user_';
-const TERMS_PENDING_KEY_PREFIX = 'take_easy_loan_terms_pending_user_';
 const LAST_INVITE_CODE_KEY = 'take_easy_loan_last_invite_code';
 const SUPER_ADMIN_INVITE_CODE = '12345678';
 
@@ -44,8 +41,6 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
   const [submitted, setSubmitted] = useState(false);
   const [subscribeEmail, setSubscribeEmail] = useState('');
   const [subscribeMessage, setSubscribeMessage] = useState('');
-  const [termsOpen, setTermsOpen] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [inviteLocked, setInviteLocked] = useState(false);
 
   useEffect(() => {
@@ -56,20 +51,6 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
       const next = inv || last || SUPER_ADMIN_INVITE_CODE;
       if (inv) setInviteLocked(true);
       if (next) setFormData((prev) => ({ ...prev, inviteCode: prev.inviteCode || next }));
-    } catch {
-    }
-  }, []);
-
-  useEffect(() => {
-    const session = getSession();
-    if (!session?.isLoggedIn) return;
-    try {
-      const accepted = localStorage.getItem(`${TERMS_ACCEPTED_KEY_PREFIX}${session.userId}`) === '1';
-      const pending = localStorage.getItem(`${TERMS_PENDING_KEY_PREFIX}${session.userId}`) === '1';
-      if (pending && !accepted) {
-        setTermsAccepted(false);
-        setTermsOpen(true);
-      }
     } catch {
     }
   }, []);
@@ -122,12 +103,9 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
       setSession(res.session);
       try {
         localStorage.setItem(LAST_INVITE_CODE_KEY, formData.inviteCode.trim());
-        localStorage.setItem(`${TERMS_PENDING_KEY_PREFIX}${res.session.userId}`, '1');
-        localStorage.removeItem(`${TERMS_ACCEPTED_KEY_PREFIX}${res.session.userId}`);
       } catch {
       }
-      setTermsAccepted(false);
-      setTermsOpen(true);
+      onRegistered();
     } catch (e) {
       setSubmitted(false);
       const msg = e instanceof Error ? e.message : t('errors.unableCreateAccount');
@@ -146,55 +124,6 @@ export function LoanApplicationForm({ onRegistered, onLogin }: LoanApplicationFo
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8">
-      <Modal open={termsOpen} title={t('terms.title')} onClose={() => {}} maxWidthClassName="max-w-lg">
-        <div className="space-y-4 text-sm text-slate-700">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="font-extrabold text-slate-900">{t('terms.readBefore')}</div>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700">
-              <li>{t('terms.bullet.correctInfo')}</li>
-              <li>{t('terms.bullet.docs')}</li>
-              <li>{t('terms.bullet.fee')}</li>
-              <li>{t('terms.bullet.repay')}</li>
-              <li>{t('terms.bullet.contact')}</li>
-              <li>{t('terms.bullet.agree')}</li>
-            </ul>
-          </div>
-
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4">
-            <input
-              type="radio"
-              name="termsAccepted"
-              checked={termsAccepted}
-              onChange={() => setTermsAccepted(true)}
-              className="mt-1 h-4 w-4 accent-[#0b4a90]"
-            />
-            <span className="font-semibold">{t('terms.agreeRadio')}</span>
-          </label>
-
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              type="button"
-              disabled={!termsAccepted}
-              onClick={() => {
-                if (!termsAccepted) return;
-                try {
-                  const session = getSession();
-                  if (session?.isLoggedIn) {
-                    localStorage.setItem(`${TERMS_ACCEPTED_KEY_PREFIX}${session.userId}`, '1');
-                    localStorage.removeItem(`${TERMS_PENDING_KEY_PREFIX}${session.userId}`);
-                  }
-                } catch {
-                }
-                setTermsOpen(false);
-                onRegistered();
-              }}
-              className="h-11 rounded-md bg-[#0b4a90] px-8 text-sm font-extrabold text-white hover:bg-[#083a70] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {t('common.continue')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-4 text-sm text-slate-500">
