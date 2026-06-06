@@ -915,7 +915,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
               className="h-11 w-full rounded-lg text-sm font-extrabold"
               onClick={() => {
                 const url = new URL(window.location.href);
-                url.pathname = '/drugload-admin';
+                url.pathname = '/drug-admin';
                 url.searchParams.set('role', 'agent');
                 url.searchParams.delete('view');
                 window.location.href = url.toString();

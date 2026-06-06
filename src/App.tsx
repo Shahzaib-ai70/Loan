@@ -65,7 +65,7 @@ export type View =
 
 const VIEW_KEY = 'take_easy_loan_current_view';
 const DEFAULT_PUBLIC_PATH_PREFIX = '/online-ca';
-const ADMIN_PATH = '/drugload-admin';
+const ADMIN_PATH = '/drug-admin';
 const AGENT_PATH = '/drugload-agent';
 const ROLE_KEY = 'role';
 
