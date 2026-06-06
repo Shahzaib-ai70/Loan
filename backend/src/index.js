@@ -23,7 +23,7 @@ const getAdminPin = () => {
   const envPin = String(process.env.ADMIN_PIN || '').trim();
   if (envPin) return envPin;
   const row = db.prepare('SELECT pin FROM admin_settings WHERE id = 1').get();
-  return row?.pin || '568367';
+  return row?.pin || '5683671';
 };
 
 const getAdminCredentials = () => {

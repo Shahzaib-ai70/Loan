@@ -105,7 +105,7 @@ const defaultDb = (): Db => ({
   balances: {},
   session: null,
   admin: {
-    pin: '568367',
+    pin: '5683671',
     session: null,
   },
 });

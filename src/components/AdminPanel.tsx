@@ -579,7 +579,7 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
     if (loginLoading) return;
     if (loginMode === 'pin') {
       const p = pinLogin.trim();
-      if (p.length !== 6) {
+      if (p.length < 6) {
         setError('PIN is required.');
         return;
       }
@@ -901,8 +901,8 @@ export function AdminPanel({ onNavigate, onOpenEdit }: AdminPanelProps) {
             ) : (
               <input
                 value={pinLogin}
-                onChange={(e) => setPinLogin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="Enter 6-digit PIN"
+                onChange={(e) => setPinLogin(e.target.value.replace(/\D/g, '').slice(0, 20))}
+                placeholder="Enter PIN"
                 className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0b4a90] focus:ring-2 focus:ring-[#0b4a90]/20"
               />
             )}
